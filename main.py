@@ -9,9 +9,9 @@ st.title("Reexpedicion Por Cumplir")
 # 1. Zona de carga de archivos
 col1, col2 = st.columns(2)
 with col1:
-    Zofri = st.file_uploader("Archivo Zofri (Documentos de Salida)", type=['xlsx', 'xls', 'csv'])
+    Zofri = st.file_uploader("Archivo Zofri", type=['xlsx', 'xls', 'csv'])
 with col2:
-    archivos_2 = st.file_uploader("Archivos Sirote(.xlsm / .xlsx / .csv)", type=['xlsm', 'xlsx', 'csv'], accept_multiple_files=True)
+    archivos_2 = st.file_uploader("Archivos Sirote", type=['xlsm', 'xlsx', 'csv'], accept_multiple_files=True)
 
 # Función auxiliar robusta para leer CSV sin errores
 def leer_csv_robusto(archivo):
@@ -88,14 +88,14 @@ if Zofri and archivos_2:
             st.subheader("Resumen de Registros")
             
             m1, m2, m3 = st.columns(3)
-            m1.metric("Registros en Archivo 1", len(df1))
+            m1.metric("Registros Zofri", len(df1))
             m2.metric("Universo de Comparación", len(df2))
             m3.metric("Coincidencias (Incluye repetidos)", len(df_match))
 
             st.write("### Detalle de Registros")
             tab1, tab2, tab3 = st.tabs([
                 "Coincidencias (Duplicados en ambos)", 
-                "Registros Archivo 1", 
+                "Registros Zofri", 
                 "Registros de Comparación (Consolidado)"
             ])
             
