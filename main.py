@@ -133,11 +133,11 @@ if Zofri and archivos_2:
 
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df_final.to_excel(writer, index=False, sheet_name='Coincidencias')
+                df_final.to_excel(writer, index=False, sheet_name='Para cumplir')
             excel_data = output.getvalue()
 
             st.download_button(
-                label="📥 Generar Excel (coincidencias.xlsx)",
+                label="📥 Generar Excel (Para cumplir Zofri.xlsx)",
                 data=excel_data,
                 file_name="coincidencias.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
