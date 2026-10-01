@@ -139,7 +139,7 @@ if Zofri and archivos_2:
             st.download_button(
                 label="📥 Generar Excel (Para cumplir Zofri.xlsx)",
                 data=excel_data,
-                file_name="coincidencias.xlsx",
+                file_name="Para cumplir Zofri",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 type="primary"
             )
