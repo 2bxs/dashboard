@@ -3,17 +3,17 @@ import pandas as pd
 import io
 
 # Configuración de página
-st.set_page_config(page_title="Dashboard de Cruce Aduanero", layout="wide")
-st.title("Reexpediciones Para cumplir")
+st.set_page_config(page_title="Reexpedicion Por Cumplir", layout="wide")
+st.title("Reexpedicion Por Cumplir")
 
 # 1. Zona de carga de archivos
 col1, col2 = st.columns(2)
 with col1:
-    archivo_1 = st.file_uploader("Datos Zofri", type=['xlsx', 'xls', 'csv'])
+    archivo_1 = st.file_uploader("Archivo Zofri (Documentos de Salida)", type=['xlsx', 'xls', 'csv'])
 with col2:
-    archivos_2 = st.file_uploader("Archivos Sirote (.xlsm / .xlsx / .csv)", type=['xlsm', 'xlsx', 'csv'], accept_multiple_files=True)
+    archivos_2 = st.file_uploader("Archivos Sirote(.xlsm / .xlsx / .csv)", type=['xlsm', 'xlsx', 'csv'], accept_multiple_files=True)
 
-# Función auxiliar robusta para leer CSV sin errores de formato o codificación
+# Función auxiliar robusta para leer CSV sin errores
 def leer_csv_robusto(archivo):
     try:
         archivo.seek(0)
@@ -31,19 +31,51 @@ if archivo_1 and archivos_2:
             df1 = pd.read_excel(archivo_1)
 
         lista_df2 = []
-        for file in archivos_2:
-            if file.name.endswith('.csv'):
-                df_temp = leer_csv_robusto(file)
-            else:
-                df_temp = pd.read_excel(file, engine='openpyxl')
-            lista_df2.append(df_temp)
         
+        # Procesar todos los archivos subidos en el cuadro 2
+        for file in archivos_2:
+            nombre_archivo = file.name.lower()
+            
+            # --- Lógica especial para el archivo de Punta Arenas ---
+            if 'puntaarenas' in nombre_archivo and nombre_archivo.endswith('.xlsx'):
+                df_temp = pd.read_excel(file, header=7, engine='openpyxl')
+                
+                if 'Numero' in df_temp.columns:
+                    mapping = {
+                        'Numero': 'Reexpediciones',
+                        'Fecha Ingreso': 'Fecha Cierre',
+                        'Num_Int': 'N° MIC'
+                    }
+                    df_temp = df_temp.rename(columns=mapping)
+                    
+                    # Forzar formato de fecha corta (DD-MM-YYYY) sin horas
+                    if 'Fecha Cierre' in df_temp.columns:
+                        df_temp['Fecha Cierre'] = pd.to_datetime(df_temp['Fecha Cierre'], errors='coerce').dt.strftime('%d-%m-%Y').fillna(df_temp['Fecha Cierre'])
+                    
+                    df_temp['Aduana Destino'] = 'Punta Arenas'
+                    if 'Patente Tracto' not in df_temp.columns:
+                        df_temp['Patente Tracto'] = pd.NA
+                else:
+                    st.warning(f"El archivo {file.name} se detectó como Punta Arenas, pero no tiene la columna 'Numero' en la fila 8.")
+                
+                lista_df2.append(df_temp)
+                
+            # Procesar el resto de archivos normalmente
+            else:
+                if nombre_archivo.endswith('.csv'):
+                    df_temp = leer_csv_robusto(file)
+                else:
+                    df_temp = pd.read_excel(file, engine='openpyxl')
+                lista_df2.append(df_temp)
+        
+        # Consolidar todo el universo de reexpediciones
         df2 = pd.concat(lista_df2, ignore_index=True)
 
+        # Validaciones de columnas maestras
         if 'documento_salida' not in df1.columns:
             st.error("El Archivo 1 no contiene la columna 'documento_salida'.")
         elif 'Reexpediciones' not in df2.columns:
-            st.error("Los Archivos 2 consolidados no contienen la columna 'Reexpediciones'.")
+            st.error("Los archivos de comparación no contienen la columna 'Reexpediciones' (o 'Numero' en el caso de Punta Arenas).")
         else:
             # 3. Limpieza y Comparación
             df1['doc_clean'] = df1['documento_salida'].astype(str).str.replace('-', '', regex=False).str.strip()
@@ -56,15 +88,15 @@ if archivo_1 and archivos_2:
             st.subheader("Resumen de Registros")
             
             m1, m2, m3 = st.columns(3)
-            m1.metric("Registros en Archivo Zofri", len(df1))
-            m2.metric("Registros en Archivo Sirote", len(df2))
+            m1.metric("Registros en Archivo 1", len(df1))
+            m2.metric("Universo de Comparación", len(df2))
             m3.metric("Coincidencias (Incluye repetidos)", len(df_match))
 
             st.write("### Detalle de Registros")
             tab1, tab2, tab3 = st.tabs([
                 "Coincidencias (Duplicados en ambos)", 
-                "Registros Zofri", 
-                "Registros Sirote"
+                "Registros Archivo 1", 
+                "Registros de Comparación (Consolidado)"
             ])
             
             with tab1:
@@ -78,24 +110,27 @@ if archivo_1 and archivos_2:
             st.divider()
             st.subheader("Exportar Resultados")
             
-            # --- NUEVO: Checkbox para filtrar fechas vacías ---
-            excluir_sin_fecha = st.checkbox("Excluir registros que no tengan datos en 'Fecha Cierre'", value=False)
+            excluir_sin_fecha = st.checkbox("Excluir registros que no tengan datos en 'Fecha Cierre' (o 'Fecha Ingreso')", value=False)
             
             columnas_reporte = ['N° MIC', 'Aduana Destino', 'Fecha Cierre', 'Patente Tracto', 'Reexpediciones']
             columnas_finales = [col for col in columnas_reporte if col in df_match.columns]
-            df_final = df_match[columnas_finales]
+            
+            # Usamos .copy() para poder modificar el DataFrame final sin advertencias de Pandas
+            df_final = df_match[columnas_finales].copy()
 
-            # Aplicar el filtro si el checkbox está marcado
+            # --- NUEVO: Formatear columna Reexpediciones quitando los guiones para el archivo de salida ---
+            if 'Reexpediciones' in df_final.columns:
+                df_final['Reexpediciones'] = df_final['Reexpediciones'].astype(str).str.replace('-', '', regex=False).str.strip()
+
+            # Aplicar filtro de fecha nula si el check está activo
             if excluir_sin_fecha and 'Fecha Cierre' in df_final.columns:
-                # Eliminar nulos reales (NaN)
                 df_final = df_final.dropna(subset=['Fecha Cierre'])
-                # Eliminar celdas que parecen vacías pero tienen espacios o la palabra "nan"
                 df_final = df_final[df_final['Fecha Cierre'].astype(str).str.strip() != '']
                 df_final = df_final[df_final['Fecha Cierre'].astype(str).str.strip().str.lower() != 'nan']
+                df_final = df_final[df_final['Fecha Cierre'].astype(str).str.strip().str.lower() != 'nat']
                 
-                st.info(f"Filtro aplicado: Se exportarán {len(df_final)} registros (se excluyeron los que no tenían Fecha de Cierre).")
+                st.info(f"Filtro aplicado: Se exportarán {len(df_final)} registros.")
 
-            # Crear archivo en memoria
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
                 df_final.to_excel(writer, index=False, sheet_name='Coincidencias')
@@ -112,4 +147,4 @@ if archivo_1 and archivos_2:
     except Exception as e:
         st.error(f"Error procesando los datos: {e}")
 else:
-    st.info("Sube el Archivo 1 y selecciona uno o varios Archivos 2 para iniciar el análisis.")
+    st.info("Sube el Archivo 1 y los Archivos 2 de comparación para iniciar el análisis.")
