@@ -9,7 +9,7 @@ st.title("Reexpedicion Por Cumplir")
 # 1. Zona de carga de archivos
 col1, col2 = st.columns(2)
 with col1:
-    archivo_1 = st.file_uploader("Archivo Zofri (Documentos de Salida)", type=['xlsx', 'xls', 'csv'])
+    Zofri = st.file_uploader("Archivo Zofri (Documentos de Salida)", type=['xlsx', 'xls', 'csv'])
 with col2:
     archivos_2 = st.file_uploader("Archivos Sirote(.xlsm / .xlsx / .csv)", type=['xlsm', 'xlsx', 'csv'], accept_multiple_files=True)
 
@@ -22,13 +22,13 @@ def leer_csv_robusto(archivo):
         archivo.seek(0)
         return pd.read_csv(archivo, encoding='latin-1', sep=None, engine='python')
 
-if archivo_1 and archivos_2:
+if Zofri and archivos_2:
     try:
         # 2. Carga y consolidación de datos
-        if archivo_1.name.endswith('.csv'):
-            df1 = leer_csv_robusto(archivo_1)
+        if Zofri.name.endswith('.csv'):
+            df1 = leer_csv_robusto(Zofri)
         else:
-            df1 = pd.read_excel(archivo_1)
+            df1 = pd.read_excel(Zofri)
 
         lista_df2 = []
         
