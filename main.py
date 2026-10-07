@@ -170,4 +170,4 @@ if Zofri and archivos_2:
     except Exception as e:
         st.error(f"Error procesando los datos: {e}")
 else:
-    st.info("Sube el Archivo 1 y los Archivos 2 de comparación para iniciar el análisis.")
+    st.info("Sube el Archivo 1 y los Archivos 2 de comparación para iniciar el análisis solo sera procesados por lo que no quedara registro guardado.")
