@@ -152,7 +152,7 @@ if Zofri and archivos_2:
                     )
                 
             with m3:
-                st.metric("Reexpediciones", n_con_fecha)
+                st.metric("Reexpediciones (con Fecha de Cierre)", n_con_fecha)
                 st.write("") # Pequeño espacio para separar la métrica del botón
                 
                 # Subcolumnas [1, 1] hacen que el botón ocupe la mitad izquierda
