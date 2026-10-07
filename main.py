@@ -31,15 +31,15 @@ if Zofri and archivos_2:
             df1 = pd.read_excel(Zofri)
 
         lista_df2 = []
-        
+
         # Procesar todos los archivos subidos en el cuadro 2
         for file in archivos_2:
             nombre_archivo = file.name.lower()
-            
+
             # --- Lógica especial para el archivo de Punta Arenas ---
             if 'puntaarenas' in nombre_archivo and nombre_archivo.endswith('.xlsx'):
                 df_temp = pd.read_excel(file, header=7, engine='openpyxl')
-                
+
                 if 'Numero' in df_temp.columns:
                     mapping = {
                         'Numero': 'Reexpediciones',
@@ -47,19 +47,19 @@ if Zofri and archivos_2:
                         'Num_Int': 'N° MIC'
                     }
                     df_temp = df_temp.rename(columns=mapping)
-                    
+
                     # Forzar formato de fecha corta (DD-MM-YYYY) sin horas
                     if 'Fecha Cierre' in df_temp.columns:
                         df_temp['Fecha Cierre'] = pd.to_datetime(df_temp['Fecha Cierre'], errors='coerce').dt.strftime('%d-%m-%Y').fillna(df_temp['Fecha Cierre'])
-                    
+
                     df_temp['Aduana Destino'] = 'Punta Arenas'
                     if 'Patente Tracto' not in df_temp.columns:
                         df_temp['Patente Tracto'] = pd.NA
                 else:
                     st.warning(f"El archivo {file.name} se detectó como Punta Arenas, pero no tiene la columna 'Numero' en la fila 8.")
-                
+
                 lista_df2.append(df_temp)
-                
+
             # Procesar el resto de archivos normalmente
             else:
                 if nombre_archivo.endswith('.csv'):
@@ -67,7 +67,7 @@ if Zofri and archivos_2:
                 else:
                     df_temp = pd.read_excel(file, engine='openpyxl')
                 lista_df2.append(df_temp)
-        
+
         # Consolidar todo el universo de reexpediciones
         df2 = pd.concat(lista_df2, ignore_index=True)
 
@@ -83,22 +83,28 @@ if Zofri and archivos_2:
 
             df_match = pd.merge(df1, df2, left_on='doc_clean', right_on='reexp_clean', how='inner')
 
-            # 4. Dashboard de visualización
+            # 4. Métricas (sin Registros Zofri)
             st.divider()
-            st.subheader("Resumen de Registros")
-            
+
+            if 'Fecha Cierre' in df_match.columns:
+                s_str = df_match['Fecha Cierre'].astype(str).str.strip()
+                s_low = s_str.str.lower()
+                n_con_fecha = int((df_match['Fecha Cierre'].notna() & (s_str != '') & (~s_low.isin(['nan', 'nat', 'none']))).sum())
+            else:
+                n_con_fecha = 0
+
             m1, m2, m3 = st.columns(3)
-            m1.metric("Registros Zofri", len(df1))
-            m2.metric("Universo de Comparación", len(df2))
-            m3.metric("Coincidencias (Incluye repetidos)", len(df_match))
+            m1.metric("Universo de Comparación", len(df2))
+            m2.metric("Coincidencias (Incluye repetidos)", len(df_match))
+            m3.metric("Coincidencias con Fecha de Cierre", n_con_fecha)
 
             st.write("### Detalle de Registros")
             tab1, tab2, tab3 = st.tabs([
-                "Coincidencias (Duplicados en ambos)", 
-                "Registros Zofri", 
+                "Coincidencias (Duplicados en ambos)",
+                "Registros Zofri",
                 "Registros de Comparación (Consolidado)"
             ])
-            
+
             with tab1:
                 st.dataframe(df_match, use_container_width=True)
             with tab2:
@@ -106,43 +112,40 @@ if Zofri and archivos_2:
             with tab3:
                 st.dataframe(df2, use_container_width=True)
 
-            # 5. Generación de Excel
+            # 5. Generación de Excel en una sola línea
             st.divider()
-            st.subheader("Exportar Resultados")
-            
-            excluir_sin_fecha = st.checkbox("Excluir registros que no tengan datos en 'Fecha Cierre' (o 'Fecha Ingreso')", value=False)
-            
+
             columnas_reporte = ['N° MIC', 'Aduana Destino', 'Fecha Cierre', 'Patente Tracto', 'Reexpediciones']
             columnas_finales = [col for col in columnas_reporte if col in df_match.columns]
-            
-            # Usamos .copy() para poder modificar el DataFrame final sin advertencias de Pandas
+
             df_final = df_match[columnas_finales].copy()
 
-            # --- NUEVO: Formatear columna Reexpediciones quitando los guiones para el archivo de salida ---
+            # Formatear columna Reexpediciones quitando los guiones para el archivo de salida
             if 'Reexpediciones' in df_final.columns:
                 df_final['Reexpediciones'] = df_final['Reexpediciones'].astype(str).str.replace('-', '', regex=False).str.strip()
 
-            # Aplicar filtro de fecha nula si el check está activo
-            if excluir_sin_fecha and 'Fecha Cierre' in df_final.columns:
-                df_final = df_final.dropna(subset=['Fecha Cierre'])
-                df_final = df_final[df_final['Fecha Cierre'].astype(str).str.strip() != '']
-                df_final = df_final[df_final['Fecha Cierre'].astype(str).str.strip().str.lower() != 'nan']
-                df_final = df_final[df_final['Fecha Cierre'].astype(str).str.strip().str.lower() != 'nat']
-                
-                st.info(f"Filtro aplicado: Se exportarán {len(df_final)} registros.")
+            col_exp1, col_exp2 = st.columns([3, 1])
+            with col_exp1:
+                excluir_sin_fecha = st.checkbox("Excluir registros sin 'Fecha Cierre'", value=False)
+            with col_exp2:
+                if excluir_sin_fecha and 'Fecha Cierre' in df_final.columns:
+                    df_final = df_final.dropna(subset=['Fecha Cierre'])
+                    df_final = df_final[df_final['Fecha Cierre'].astype(str).str.strip() != '']
+                    df_final = df_final[df_final['Fecha Cierre'].astype(str).str.strip().str.lower() != 'nan']
+                    df_final = df_final[df_final['Fecha Cierre'].astype(str).str.strip().str.lower() != 'nat']
 
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df_final.to_excel(writer, index=False, sheet_name='Para cumplir')
-            excel_data = output.getvalue()
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    df_final.to_excel(writer, index=False, sheet_name='Para cumplir')
+                excel_data = output.getvalue()
 
-            st.download_button(
-                label="📥 Generar Excel (Para cumplir Zofri.xlsx)",
-                data=excel_data,
-                file_name="Para cumplir Zofri.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                type="primary"
-            )
+                st.download_button(
+                    label="📥 Generar Excel",
+                    data=excel_data,
+                    file_name="Para cumplir Zofri.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    type="primary"
+                )
 
     except Exception as e:
         st.error(f"Error procesando los datos: {e}")
