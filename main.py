@@ -1,8 +1,3 @@
-Aquí tienes el código actualizado. He movido la lógica de exportación a Excel justo debajo de las métricas.
-
-Ahora, la columna central tiene el botón para descargar **todas las coincidencias**, y la columna de la derecha tiene el botón para descargar **solo las que tienen fecha de cierre** (filtrándolas automáticamente). Para que el código quede limpio, creé una pequeña función auxiliar (`generar_excel`) que convierte los DataFrames al formato Excel en memoria.
-
-```python
 import streamlit as st
 import pandas as pd
 import io
