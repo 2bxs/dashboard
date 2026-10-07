@@ -144,7 +144,7 @@ if Zofri and archivos_2:
                 btn_col1, _ = st.columns([1, 1])
                 with btn_col1:
                     st.download_button(
-                        label="📥 Excel (Todas)",
+                        label="📥 Generar",
                         data=generar_excel(df_todas),
                         file_name="Coincidencias_Totales.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -159,7 +159,7 @@ if Zofri and archivos_2:
                 btn_col2, _ = st.columns([1, 1])
                 with btn_col2:
                     st.download_button(
-                        label="📥 Excel (Con Fecha)",
+                        label="📥 Genera documento para cumplir",
                         data=generar_excel(df_con_fecha_export),
                         file_name="Reexpediciones para cumplir.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
