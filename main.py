@@ -137,7 +137,7 @@ if Zofri and archivos_2:
                 st.metric("Universo de Comparación", len(df2))
                 
             with m2:
-                st.metric("Coincidencias (Incluye repetidos)", len(df_match))
+                st.metric("Coincidencias", len(df_match))
                 st.write("") # Pequeño espacio para separar la métrica del botón
                 
                 # Subcolumnas [1, 1] hacen que el botón ocupe la mitad izquierda
@@ -152,7 +152,7 @@ if Zofri and archivos_2:
                     )
                 
             with m3:
-                st.metric("Coincidencias con Fecha de Cierre", n_con_fecha)
+                st.metric("Reexpediciones", n_con_fecha)
                 st.write("") # Pequeño espacio para separar la métrica del botón
                 
                 # Subcolumnas [1, 1] hacen que el botón ocupe la mitad izquierda
@@ -161,7 +161,7 @@ if Zofri and archivos_2:
                     st.download_button(
                         label="📥 Excel (Con Fecha)",
                         data=generar_excel(df_con_fecha_export),
-                        file_name="Coincidencias_Con_Fecha.xlsx",
+                        file_name="Reexpediciones para cumplir.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         type="primary",
                         use_container_width=True
