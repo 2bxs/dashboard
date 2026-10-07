@@ -13,7 +13,7 @@ div[data-testid="stMetric"] {
     border: 2px solid #FF8C00; /* Color naranjo candy */
     border-radius: 15px;       /* Esquinas redondeadas */
     padding: 15px;             /* Espacio interior para que no quede pegado al borde */
-    background-color: rgba(255, 140, 0, 0.05); /* (Opcional) Fondo con un toque muy suave de naranja */
+   
 }
 </style>
 """, unsafe_allow_html=True)
