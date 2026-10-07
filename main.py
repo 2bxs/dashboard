@@ -4,6 +4,20 @@ import io
 
 # Configuración de página
 st.set_page_config(page_title="Reexpedicion Por Cumplir", layout="wide")
+
+# CSS personalizado para los bordes redondeados y naranjo candy en las métricas
+st.markdown("""
+<style>
+/* Apuntar al contenedor de las métricas en Streamlit */
+div[data-testid="stMetric"] {
+    border: 2px solid #FF8C00; /* Color naranjo candy */
+    border-radius: 15px;       /* Esquinas redondeadas */
+    padding: 15px;             /* Espacio interior para que no quede pegado al borde */
+    background-color: rgba(255, 140, 0, 0.05); /* (Opcional) Fondo con un toque muy suave de naranja */
+}
+</style>
+""", unsafe_allow_html=True)
+
 st.title("Reexpedicion Por Cumplir")
 
 # 1. Zona de carga de archivos
@@ -123,27 +137,35 @@ if Zofri and archivos_2:
                 st.metric("Universo de Comparación", len(df2))
                 
             with m2:
-                st.metric("Coincidencias", len(df_match))
-                # Botón para descargar TODAS las coincidencias
-                st.download_button(
-                    label="📥 Generar Excel (Todas)",
-                    data=generar_excel(df_todas),
-                    file_name="Coincidencias_Totales.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
-                )
+                st.metric("Coincidencias (Incluye repetidos)", len(df_match))
+                st.write("") # Pequeño espacio para separar la métrica del botón
+                
+                # Subcolumnas [1, 1] hacen que el botón ocupe la mitad izquierda
+                btn_col1, _ = st.columns([1, 1])
+                with btn_col1:
+                    st.download_button(
+                        label="📥 Excel (Todas)",
+                        data=generar_excel(df_todas),
+                        file_name="Coincidencias_Totales.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True
+                    )
                 
             with m3:
-                st.metric("Reexpediciones", n_con_fecha)
-                # Botón para descargar EXCLUYENDO las que no tienen fecha
-                st.download_button(
-                    label="📥 Generar Excel",
-                    data=generar_excel(df_con_fecha_export),
-                    file_name="Para cumplir Zofri.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    type="primary",
-                    use_container_width=True
-                )
+                st.metric("Coincidencias con Fecha de Cierre", n_con_fecha)
+                st.write("") # Pequeño espacio para separar la métrica del botón
+                
+                # Subcolumnas [1, 1] hacen que el botón ocupe la mitad izquierda
+                btn_col2, _ = st.columns([1, 1])
+                with btn_col2:
+                    st.download_button(
+                        label="📥 Excel (Con Fecha)",
+                        data=generar_excel(df_con_fecha_export),
+                        file_name="Coincidencias_Con_Fecha.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        type="primary",
+                        use_container_width=True
+                    )
 
     except Exception as e:
         st.error(f"Error procesando los datos: {e}")
