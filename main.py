@@ -83,7 +83,7 @@ if Zofri and archivos_2:
 
             df_match = pd.merge(df1, df2, left_on='doc_clean', right_on='reexp_clean', how='inner')
 
-            # 4. Métricas (sin Registros Zofri)
+            # 4. Métricas
             st.divider()
 
             if 'Fecha Cierre' in df_match.columns:
@@ -98,21 +98,7 @@ if Zofri and archivos_2:
             m2.metric("Coincidencias (Incluye repetidos)", len(df_match))
             m3.metric("Coincidencias con Fecha de Cierre", n_con_fecha)
 
-            st.write("### Detalle de Registros")
-            tab1, tab2, tab3 = st.tabs([
-                "Coincidencias (Duplicados en ambos)",
-                "Registros Zofri",
-                "Registros de Comparación (Consolidado)"
-            ])
-
-            with tab1:
-                st.dataframe(df_match, use_container_width=True)
-            with tab2:
-                st.dataframe(df1[['documento_salida']], use_container_width=True)
-            with tab3:
-                st.dataframe(df2, use_container_width=True)
-
-            # 5. Generación de Excel en una sola línea
+            # 5. Generación de Excel
             st.divider()
 
             columnas_reporte = ['N° MIC', 'Aduana Destino', 'Fecha Cierre', 'Patente Tracto', 'Reexpediciones']
@@ -134,18 +120,18 @@ if Zofri and archivos_2:
                     df_final = df_final[df_final['Fecha Cierre'].astype(str).str.strip().str.lower() != 'nan']
                     df_final = df_final[df_final['Fecha Cierre'].astype(str).str.strip().str.lower() != 'nat']
 
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                    df_final.to_excel(writer, index=False, sheet_name='Para cumplir')
-                excel_data = output.getvalue()
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df_final.to_excel(writer, index=False, sheet_name='Para cumplir')
+            excel_data = output.getvalue()
 
-                st.download_button(
-                    label="📥 Generar Excel",
-                    data=excel_data,
-                    file_name="Para cumplir Zofri.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    type="primary"
-                )
+            st.download_button(
+                label="📥 Generar Excel",
+                data=excel_data,
+                file_name="Para cumplir Zofri.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                type="primary"
+            )
 
     except Exception as e:
         st.error(f"Error procesando los datos: {e}")
