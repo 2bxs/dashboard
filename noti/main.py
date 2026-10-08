@@ -23,7 +23,7 @@ def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, tem
     template_file.seek(0)
     doc = Document(template_file)
     
-    # Mapeo de reemplazos en el texto general
+    # Mapeo de reemplazos en el texto general (Se agregaron ambas variantes de fecha)
     replacements = {
         "[NOM_IMPOR]": str(razon_social),
         "[RUT_IMP]": str(rut),
@@ -31,6 +31,7 @@ def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, tem
         "[CORREO]": str(correo),
         "[NRM]": str(nrm),
         "[FECHA_GEN]": str(fecha_gen),
+        "[FECH_GEN]": str(fecha_gen), # Cubre el caso de que le falte la 'A' en el Word
         "[GENE]": str(gene)
     }
     
@@ -49,7 +50,7 @@ def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, tem
                 if any("[COD_RE]" in cell.text for cell in row.cells):
                     row._element.getparent().remove(row._element) # Borra la fila del Word
 
-        # B. SEGUNDO: Reemplazar etiquetas como [FECHA_GEN] y [NRM] que estén dentro de CUALQUIER tabla
+        # B. SEGUNDO: Reemplazar etiquetas como [FECHA_GEN], [FECH_GEN] y [NRM] dentro de las tablas
         for table in doc.tables:
             for row in table.rows:
                 for cell in row.cells:
