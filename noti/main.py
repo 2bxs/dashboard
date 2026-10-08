@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 from docx import Document
-from docx.shared import Pt  # NUEVO: Para cambiar el tamaño de letra
+from docx.shared import Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH  # NUEVO: Para centrar el texto
 from docx2pdf import convert
 import os
 import zipfile
@@ -22,7 +23,7 @@ def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, tem
     template_file.seek(0)
     doc = Document(template_file)
     
-    # Mapeo exacto según tu imagen image_ecc00b.png
+    # Mapeo de reemplazos en el texto general
     replacements = {
         "[NOM_IMPOR]": str(razon_social),
         "[RUT_IMP]": str(rut),
@@ -30,7 +31,9 @@ def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, tem
         "[CORREO]": str(correo),
         "[NRM]": str(nrm),
         "[FECHA_GEN]": str(fecha_gen),
-        "[GENE]": str(gene)
+        "[GENE]": str(gene),
+        # Por si quedaron sueltas fuera de la tabla
+        "[COD_RE]": "", "[FECH_DOC]": "", "[FECH_SAL]": "", "[AVANZADA]": ""
     }
     
     # 1. Reemplazar en párrafos normales
@@ -39,40 +42,47 @@ def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, tem
             if key in p.text:
                 p.text = p.text.replace(key, val)
                 
-    # 2. Reemplazar y llenar tablas
+    # 2. Llenado y formateo de la tabla
     if doc.tables: 
-        # Reemplazar etiquetas estáticas que puedan estar dentro de alguna tabla
+        # A. Eliminar la fila de plantilla que contiene las etiquetas base
         for table in doc.tables:
             for row in table.rows:
-                for cell in row.cells:
-                    for p in cell.paragraphs:
-                        for key, val in replacements.items():
-                            if key in p.text:
-                                p.text = p.text.replace(key, val)
+                if any("[COD_RE]" in cell.text for cell in row.cells):
+                    row._element.getparent().remove(row._element) # Borra la fila del Word
 
-        # Llenar la tabla dinámica con las reexpediciones (Se asume que es la primera tabla doc.tables[0])
+        # B. Función para asegurar que la fecha sea DD-MM-AAAA sin hora
+        def formatear_fecha(valor):
+            if pd.isna(valor) or str(valor).strip() in ["", "NaT"]:
+                return ""
+            try:
+                return pd.to_datetime(valor).strftime("%d-%m-%Y")
+            except:
+                return str(valor).split(" ")[0]
+
+        # C. Llenar la tabla dinámica con las reexpediciones (tabla principal)
         tabla_dinamica = doc.tables[0]
         for _, reexp_row in grupo_rut.iterrows():
             cells = tabla_dinamica.add_row().cells
             
-            # Asignación según nombres exactos de columnas en image_ecc00b.png
+            # Asignar valores formateados
             if len(cells) >= 4: 
                 cells[0].text = str(reexp_row.get('REEXP.', ''))
-                cells[1].text = str(reexp_row.get('Fecha Documento/ Visación', ''))
-                cells[2].text = str(reexp_row.get('Fecha Control Salida', ''))
+                cells[1].text = formatear_fecha(reexp_row.get('Fecha Documento/ Visación'))
+                cells[2].text = formatear_fecha(reexp_row.get('Fecha Control Salida'))
                 cells[3].text = str(reexp_row.get('Avanzada Aduana', ''))
             
-            # Si mantuviste las columnas 5 y 6 para NRM y FECHA (según pediste anteriormente)
             if len(cells) >= 6:
                 cells[4].text = str(nrm)
                 cells[5].text = str(fecha_gen)
 
-            # NUEVO: Ajustar el tamaño de la letra a 8 para mantenerlo en 1 hoja
+            # NUEVO: Centrar el texto, aplicar Negrita y tamaño 8 a cada celda insertada
             for cell in cells:
                 for paragraph in cell.paragraphs:
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER # Centrado
                     for run in paragraph.runs:
-                        run.font.name = 'Arial' # Opcional: Estandariza la fuente
-                        run.font.size = Pt(8)   # Achica el texto
+                        run.font.name = 'Arial' 
+                        run.font.size = Pt(8)   
+                        run.font.bold = True    # Negrita
 
     os.makedirs("temp_docs", exist_ok=True)
     docx_path = f"temp_docs/{nrm}.docx"
@@ -97,7 +107,6 @@ if excel_file and template_file:
     df = pd.read_excel(excel_file)
     df.columns = df.columns.str.strip()
     
-    # Procesamiento flexible de Teléfonos
     if 'FONO 1' in df.columns:
         df['TELE_FINAL'] = df['FONO 1']
         if 'FONO 2' in df.columns: df['TELE_FINAL'] = df['TELE_FINAL'].fillna(df['FONO 2'])
@@ -105,7 +114,6 @@ if excel_file and template_file:
     else:
         df['TELE_FINAL'] = "SIN FONO"
 
-    # Procesamiento flexible de Correos (Nuevo según imagen)
     if 'CORREO 1' in df.columns:
         df['CORREO_FINAL'] = df['CORREO 1']
         if 'CORREO 2' in df.columns: df['CORREO_FINAL'] = df['CORREO_FINAL'].fillna(df['CORREO 2'])
@@ -224,27 +232,4 @@ if excel_file and template_file:
 
     # --- SECCIÓN MASIVA ---
     st.subheader("Generación Masiva en ZIP")
-    if st.button("Generar Todos los Documentos Listados", type="primary"):
-        with st.spinner("Generando documentos masivos..."):
-            generated_files = []
-            
-            for datos in archivos_para_masivo:
-                file_path, _ = procesar_documento(
-                    datos['rut'], datos['nrm'], datos['fecha_gen'], 
-                    datos['gene'], datos['razon_social'], df, template_file
-                )
-                generated_files.append(file_path)
-            
-            if generated_files:
-                zip_buffer = io.BytesIO()
-                with zipfile.ZipFile(zip_buffer, "w") as zip_file:
-                    for file_path in generated_files:
-                        zip_file.write(file_path, os.path.basename(file_path))
-                
-                st.success("¡Documentos masivos generados con éxito!")
-                st.download_button(
-                    label="📥 Descargar ZIP Completo",
-                    data=zip_buffer.getvalue(),
-                    file_name="Notificaciones_Generadas.zip",
-                    mime="application/zip"
-                )
+    if st.button("Generar Todos los Documentos List
