@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from docx import Document
+from docx.shared import Pt  # NUEVO: Para cambiar el tamaño de letra
 from docx2pdf import convert
 import os
 import zipfile
@@ -14,38 +15,64 @@ st.title("Generador Masivo de Notificaciones (Reexpediciones)")
 # --- FUNCION REUTILIZABLE PARA GENERAR EL DOCUMENTO ---
 def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, template_file):
     grupo_rut = df_completo[df_completo['RUT'] == rut]
-    correo = grupo_rut['CRREO 1'].iloc[0] if 'CRREO 1' in grupo_rut.columns else ""
-    tele = grupo_rut['TELE'].iloc[0]
+    
+    correo = grupo_rut['CORREO_FINAL'].iloc[0] if 'CORREO_FINAL' in grupo_rut.columns else ""
+    tele = grupo_rut['TELE_FINAL'].iloc[0] if 'TELE_FINAL' in grupo_rut.columns else ""
 
     template_file.seek(0)
     doc = Document(template_file)
     
+    # Mapeo exacto según tu imagen image_ecc00b.png
     replacements = {
         "[NOM_IMPOR]": str(razon_social),
         "[RUT_IMP]": str(rut),
         "[TELE]": str(tele),
         "[CORREO]": str(correo),
-        "[NRM]": nrm,
-        "[FECHA_GEN]": fecha_gen,
-        "[GENE]": gene
+        "[NRM]": str(nrm),
+        "[FECHA_GEN]": str(fecha_gen),
+        "[GENE]": str(gene)
     }
     
+    # 1. Reemplazar en párrafos normales
     for p in doc.paragraphs:
         for key, val in replacements.items():
             if key in p.text:
                 p.text = p.text.replace(key, val)
                 
+    # 2. Reemplazar y llenar tablas
     if doc.tables: 
+        # Reemplazar etiquetas estáticas que puedan estar dentro de alguna tabla
         for table in doc.tables:
-            for _, reexp_row in grupo_rut.iterrows():
-                cells = table.add_row().cells
-                if len(cells) >= 6: 
-                    cells[0].text = str(reexp_row.get('REEXP.', ''))
-                    cells[1].text = str(reexp_row.get('FECHA DOCUMENTO/VISACION', ''))
-                    cells[2].text = str(reexp_row.get('FECHA CONTROL SALIDA', ''))
-                    cells[3].text = str(reexp_row.get('AVANZADA ADUANA', ''))
-                    cells[4].text = nrm
-                    cells[5].text = fecha_gen
+            for row in table.rows:
+                for cell in row.cells:
+                    for p in cell.paragraphs:
+                        for key, val in replacements.items():
+                            if key in p.text:
+                                p.text = p.text.replace(key, val)
+
+        # Llenar la tabla dinámica con las reexpediciones (Se asume que es la primera tabla doc.tables[0])
+        tabla_dinamica = doc.tables[0]
+        for _, reexp_row in grupo_rut.iterrows():
+            cells = tabla_dinamica.add_row().cells
+            
+            # Asignación según nombres exactos de columnas en image_ecc00b.png
+            if len(cells) >= 4: 
+                cells[0].text = str(reexp_row.get('REEXP.', ''))
+                cells[1].text = str(reexp_row.get('Fecha Documento/ Visación', ''))
+                cells[2].text = str(reexp_row.get('Fecha Control Salida', ''))
+                cells[3].text = str(reexp_row.get('Avanzada Aduana', ''))
+            
+            # Si mantuviste las columnas 5 y 6 para NRM y FECHA (según pediste anteriormente)
+            if len(cells) >= 6:
+                cells[4].text = str(nrm)
+                cells[5].text = str(fecha_gen)
+
+            # NUEVO: Ajustar el tamaño de la letra a 8 para mantenerlo en 1 hoja
+            for cell in cells:
+                for paragraph in cell.paragraphs:
+                    for run in paragraph.runs:
+                        run.font.name = 'Arial' # Opcional: Estandariza la fuente
+                        run.font.size = Pt(8)   # Achica el texto
 
     os.makedirs("temp_docs", exist_ok=True)
     docx_path = f"temp_docs/{nrm}.docx"
@@ -70,10 +97,21 @@ if excel_file and template_file:
     df = pd.read_excel(excel_file)
     df.columns = df.columns.str.strip()
     
-    if 'FONO 1' in df.columns and 'FONO 2' in df.columns and 'FONO 3' in df.columns:
-        df['TELE'] = df['FONO 1'].fillna(df['FONO 2']).fillna(df['FONO 3'])
+    # Procesamiento flexible de Teléfonos
+    if 'FONO 1' in df.columns:
+        df['TELE_FINAL'] = df['FONO 1']
+        if 'FONO 2' in df.columns: df['TELE_FINAL'] = df['TELE_FINAL'].fillna(df['FONO 2'])
+        if 'FONO 3' in df.columns: df['TELE_FINAL'] = df['TELE_FINAL'].fillna(df['FONO 3'])
     else:
-        df['TELE'] = "SIN FONO"
+        df['TELE_FINAL'] = "SIN FONO"
+
+    # Procesamiento flexible de Correos (Nuevo según imagen)
+    if 'CORREO 1' in df.columns:
+        df['CORREO_FINAL'] = df['CORREO 1']
+        if 'CORREO 2' in df.columns: df['CORREO_FINAL'] = df['CORREO_FINAL'].fillna(df['CORREO 2'])
+        if 'CORREO 3' in df.columns: df['CORREO_FINAL'] = df['CORREO_FINAL'].fillna(df['CORREO 3'])
+    else:
+        df['CORREO_FINAL'] = "SIN CORREO"
 
     resumen = df.groupby('RUT').agg(
         Razon_Social=('Razon Social', 'first'),
@@ -82,7 +120,7 @@ if excel_file and template_file:
 
     resumen = resumen.rename(columns={'Razon_Social': 'Nombre de Empresa', 'Cantidad': 'Cantidad de Reexpediciones'})
 
-    # --- CALLBACKS PARA ACTUALIZAR TODA LA TABLA AL MISMO TIEMPO ---
+    # --- CALLBACKS PARA ACTUALIZAR TODA LA TABLA ---
     def actualizar_iniciales():
         nuevo_valor = st.session_state.global_iniciales
         for r in resumen['RUT']:
@@ -110,7 +148,6 @@ if excel_file and template_file:
     hoy = datetime.datetime.now()
     fecha_actual_texto = f"{hoy.day:02d} de {meses[hoy.month - 1]} de {hoy.year}"
     
-    # Asignar valores iniciales si no existen en session_state
     for i, row in resumen.iterrows():
         rut = row['RUT']
         if f"fec_{rut}" not in st.session_state:
@@ -119,7 +156,7 @@ if excel_file and template_file:
     st.divider()
     st.subheader("Registros Pendientes")
     
-    # --- CONSTRUCCIÓN DE TABLA (Ahora con 8 columnas para separar botones) ---
+    # --- TABLA DE REGISTROS ---
     col_widths = [2.2, 1.2, 0.6, 1.2, 1.5, 0.8, 1.0, 1.0] 
     
     h1, h2, h3, h4, h5, h6, h7, h8 = st.columns(col_widths)
@@ -144,7 +181,6 @@ if excel_file and template_file:
         c2.write(rut)
         c3.write(str(row['Cantidad de Reexpediciones']))
         
-        # Cuadros de texto (Se alimentan directamente de st.session_state gracias al key)
         nrm = c4.text_input("NRM", key=f"nrm_{rut}", label_visibility="collapsed")
         fecha_gen = c5.text_input("Fecha", key=f"fec_{rut}", label_visibility="collapsed")
         gene = c6.text_input("Gene", key=f"gen_{rut}", label_visibility="collapsed")
@@ -160,7 +196,6 @@ if excel_file and template_file:
 
         key_estado = f"file_data_{rut}"
         
-        # Columna 7: Botón Generar
         with c7:
             if st.button("⚙️ Generar", key=f"btn_gen_{rut}"):
                 if nrm: 
@@ -174,12 +209,11 @@ if excel_file and template_file:
                                 "mime": "application/pdf" if ext == "pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                             }
         
-        # Columna 8: Botón Descargar (En la misma línea)
         with c8:
             if key_estado in st.session_state:
                 file_info = st.session_state[key_estado]
                 st.download_button(
-                    label="📥 Descargar",
+                    label="📥 PDF",
                     data=file_info["bytes"],
                     file_name=file_info["name"],
                     mime=file_info["mime"],
@@ -188,7 +222,7 @@ if excel_file and template_file:
 
     st.divider()
 
-    # --- SECCIÓN DE GENERACIÓN MASIVA ---
+    # --- SECCIÓN MASIVA ---
     st.subheader("Generación Masiva en ZIP")
     if st.button("Generar Todos los Documentos Listados", type="primary"):
         with st.spinner("Generando documentos masivos..."):
