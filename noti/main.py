@@ -41,7 +41,7 @@ if excel_file and template_file:
         razon_social = group['Razon Social'].iloc[0]
         
         with st.expander(f"RUT: {rut} - {razon_social} ({len(group)} reexpediciones)"):
-            st.dataframe(group[['REEXP.', 'FECHA DOCUMENTO/VISACION', 'FECHA CONTROL SALIDA', 'AVANZADA ADUANA']])
+            st.dataframe(group[['REEXP.', 'Fecha Documento/ Visación', 'Fecha Control Salida', 'Avanzada Aduana']])
             
             # Entradas manuales por cada RUT
             c1, c2, c3 = st.columns(3)
