@@ -102,4 +102,115 @@ if excel_file and template_file:
     
     col_a, col_b = st.columns(2)
     with col_a:
-        st.number_input("Inicio de MR (NRM Inicial)", min_value=0, value=0, step=1, key="global_nrm", on
+        st.number_input("Inicio de MR (NRM Inicial)", min_value=0, value=0, step=1, key="global_nrm", on_change=actualizar_nrm)
+    with col_b:
+        st.text_input("Iniciales de quien genera", key="global_iniciales", on_change=actualizar_iniciales)
+
+    meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+    hoy = datetime.datetime.now()
+    fecha_actual_texto = f"{hoy.day:02d} de {meses[hoy.month - 1]} de {hoy.year}"
+    
+    # Asignar valores iniciales si no existen en session_state
+    for i, row in resumen.iterrows():
+        rut = row['RUT']
+        if f"fec_{rut}" not in st.session_state:
+            st.session_state[f"fec_{rut}"] = fecha_actual_texto
+
+    st.divider()
+    st.subheader("Registros Pendientes")
+    
+    # --- CONSTRUCCIÓN DE TABLA (Ahora con 8 columnas para separar botones) ---
+    col_widths = [2.2, 1.2, 0.6, 1.2, 1.5, 0.8, 1.0, 1.0] 
+    
+    h1, h2, h3, h4, h5, h6, h7, h8 = st.columns(col_widths)
+    h1.markdown("**Empresa**")
+    h2.markdown("**RUT**")
+    h3.markdown("**Cant.**")
+    h4.markdown("**NRM**")
+    h5.markdown("**Fecha Gen.**")
+    h6.markdown("**Gene**")
+    h7.markdown("**Acción**")
+    h8.markdown("**Archivo**")
+    
+    st.markdown("---") 
+
+    archivos_para_masivo = []
+
+    for index, row in resumen.iterrows():
+        c1, c2, c3, c4, c5, c6, c7, c8 = st.columns(col_widths)
+        rut = row['RUT']
+        
+        c1.write(row['Nombre de Empresa'])
+        c2.write(rut)
+        c3.write(str(row['Cantidad de Reexpediciones']))
+        
+        # Cuadros de texto (Se alimentan directamente de st.session_state gracias al key)
+        nrm = c4.text_input("NRM", key=f"nrm_{rut}", label_visibility="collapsed")
+        fecha_gen = c5.text_input("Fecha", key=f"fec_{rut}", label_visibility="collapsed")
+        gene = c6.text_input("Gene", key=f"gen_{rut}", label_visibility="collapsed")
+        
+        if nrm:
+            archivos_para_masivo.append({
+                "rut": rut,
+                "nrm": nrm,
+                "fecha_gen": fecha_gen,
+                "gene": gene,
+                "razon_social": row['Nombre de Empresa']
+            })
+
+        key_estado = f"file_data_{rut}"
+        
+        # Columna 7: Botón Generar
+        with c7:
+            if st.button("⚙️ Generar", key=f"btn_gen_{rut}"):
+                if nrm: 
+                    with st.spinner("⏳"):
+                        file_path, ext = procesar_documento(rut, nrm, fecha_gen, gene, row['Nombre de Empresa'], df, template_file)
+                        
+                        with open(file_path, "rb") as f:
+                            st.session_state[key_estado] = {
+                                "bytes": f.read(),
+                                "name": os.path.basename(file_path),
+                                "mime": "application/pdf" if ext == "pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            }
+        
+        # Columna 8: Botón Descargar (En la misma línea)
+        with c8:
+            if key_estado in st.session_state:
+                file_info = st.session_state[key_estado]
+                st.download_button(
+                    label="📥 Descargar",
+                    data=file_info["bytes"],
+                    file_name=file_info["name"],
+                    mime=file_info["mime"],
+                    key=f"btn_dl_{rut}"
+                )
+
+    st.divider()
+
+    # --- SECCIÓN DE GENERACIÓN MASIVA ---
+    st.subheader("Generación Masiva en ZIP")
+    if st.button("Generar Todos los Documentos Listados", type="primary"):
+        with st.spinner("Generando documentos masivos..."):
+            generated_files = []
+            
+            for datos in archivos_para_masivo:
+                file_path, _ = procesar_documento(
+                    datos['rut'], datos['nrm'], datos['fecha_gen'], 
+                    datos['gene'], datos['razon_social'], df, template_file
+                )
+                generated_files.append(file_path)
+            
+            if generated_files:
+                zip_buffer = io.BytesIO()
+                with zipfile.ZipFile(zip_buffer, "w") as zip_file:
+                    for file_path in generated_files:
+                        zip_file.write(file_path, os.path.basename(file_path))
+                
+                st.success("¡Documentos masivos generados con éxito!")
+                st.download_button(
+                    label="📥 Descargar ZIP Completo",
+                    data=zip_buffer.getvalue(),
+                    file_name="Notificaciones_Generadas.zip",
+                    mime="application/zip"
+                )
