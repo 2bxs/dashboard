@@ -23,7 +23,7 @@ def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, tem
     template_file.seek(0)
     doc = Document(template_file)
     
-    # Mapeo de reemplazos en el texto general (Se agregaron ambas variantes de fecha)
+    # Mapeo de reemplazos en el texto general
     replacements = {
         "[NOM_IMPOR]": str(razon_social),
         "[RUT_IMP]": str(rut),
@@ -31,15 +31,20 @@ def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, tem
         "[CORREO]": str(correo),
         "[NRM]": str(nrm),
         "[FECHA_GEN]": str(fecha_gen),
-        "[FECH_GEN]": str(fecha_gen), # Cubre el caso de que le falte la 'A' en el Word
+        "[FECH_GEN]": str(fecha_gen), 
         "[GENE]": str(gene)
     }
     
-    # 1. Reemplazar en párrafos normales (fuera de tablas)
+    # 1. Reemplazar en párrafos normales (fuera de tablas) y aplicar formato
     for p in doc.paragraphs:
         for key, val in replacements.items():
             if key in p.text:
                 p.text = p.text.replace(key, val)
+                # Aplicar formato Tahoma, 9, Negrita al párrafo modificado
+                for run in p.runs:
+                    run.font.name = 'Tahoma'
+                    run.font.size = Pt(9)
+                    run.font.bold = True
                 
     # 2. Operaciones dentro de las tablas
     if doc.tables: 
@@ -50,7 +55,7 @@ def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, tem
                 if any("[COD_RE]" in cell.text for cell in row.cells):
                     row._element.getparent().remove(row._element) # Borra la fila del Word
 
-        # B. SEGUNDO: Reemplazar etiquetas como [FECHA_GEN], [FECH_GEN] y [NRM] dentro de las tablas
+        # B. SEGUNDO: Reemplazar etiquetas dentro de las tablas y aplicar formato
         for table in doc.tables:
             for row in table.rows:
                 for cell in row.cells:
@@ -58,6 +63,10 @@ def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, tem
                         for key, val in replacements.items():
                             if key in p.text:
                                 p.text = p.text.replace(key, val)
+                                for run in p.runs:
+                                    run.font.name = 'Tahoma'
+                                    run.font.size = Pt(9)
+                                    run.font.bold = True
 
         # C. Función para asegurar que la fecha del Excel sea DD-MM-AAAA sin hora
         def formatear_fecha(valor):
@@ -84,13 +93,13 @@ def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, tem
                 cells[4].text = str(nrm)
                 cells[5].text = str(fecha_gen)
 
-            # Centrar el texto, aplicar Negrita y tamaño 8 a cada celda insertada
+            # Centrar el texto, aplicar Tahoma, tamaño 9 y Negrita a cada celda insertada
             for cell in cells:
                 for paragraph in cell.paragraphs:
                     paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER # Centrado
                     for run in paragraph.runs:
-                        run.font.name = 'Arial' 
-                        run.font.size = Pt(8)   
+                        run.font.name = 'Tahoma' 
+                        run.font.size = Pt(9)   
                         run.font.bold = True    # Negrita
 
     os.makedirs("temp_docs", exist_ok=True)
