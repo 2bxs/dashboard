@@ -232,4 +232,27 @@ if excel_file and template_file:
 
     # --- SECCIÓN MASIVA ---
     st.subheader("Generación Masiva en ZIP")
-    if st.button("Generar Todos los Documentos List
+    if st.button("Generar Todos los Documentos Listados", type="primary"):
+        with st.spinner("Generando documentos masivos..."):
+            generated_files = []
+            
+            for datos in archivos_para_masivo:
+                file_path, _ = procesar_documento(
+                    datos['rut'], datos['nrm'], datos['fecha_gen'], 
+                    datos['gene'], datos['razon_social'], df, template_file
+                )
+                generated_files.append(file_path)
+            
+            if generated_files:
+                zip_buffer = io.BytesIO()
+                with zipfile.ZipFile(zip_buffer, "w") as zip_file:
+                    for file_path in generated_files:
+                        zip_file.write(file_path, os.path.basename(file_path))
+                
+                st.success("¡Documentos masivos generados con éxito!")
+                st.download_button(
+                    label="📥 Descargar ZIP Completo",
+                    data=zip_buffer.getvalue(),
+                    file_name="Notificaciones_Generadas.zip",
+                    mime="application/zip"
+                )
