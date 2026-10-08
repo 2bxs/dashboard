@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from docx import Document
 from docx.shared import Pt
-from docx.enum.text import WD_ALIGN_PARAGRAPH  # NUEVO: Para centrar el texto
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx2pdf import convert
 import os
 import zipfile
@@ -31,26 +31,34 @@ def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, tem
         "[CORREO]": str(correo),
         "[NRM]": str(nrm),
         "[FECHA_GEN]": str(fecha_gen),
-        "[GENE]": str(gene),
-        # Por si quedaron sueltas fuera de la tabla
-        "[COD_RE]": "", "[FECH_DOC]": "", "[FECH_SAL]": "", "[AVANZADA]": ""
+        "[GENE]": str(gene)
     }
     
-    # 1. Reemplazar en párrafos normales
+    # 1. Reemplazar en párrafos normales (fuera de tablas)
     for p in doc.paragraphs:
         for key, val in replacements.items():
             if key in p.text:
                 p.text = p.text.replace(key, val)
                 
-    # 2. Llenado y formateo de la tabla
+    # 2. Operaciones dentro de las tablas
     if doc.tables: 
-        # A. Eliminar la fila de plantilla que contiene las etiquetas base
+        
+        # A. PRIMERO: Eliminar la fila de plantilla que contiene las etiquetas base
         for table in doc.tables:
             for row in table.rows:
                 if any("[COD_RE]" in cell.text for cell in row.cells):
                     row._element.getparent().remove(row._element) # Borra la fila del Word
 
-        # B. Función para asegurar que la fecha sea DD-MM-AAAA sin hora
+        # B. SEGUNDO: Reemplazar etiquetas como [FECHA_GEN] y [NRM] que estén dentro de CUALQUIER tabla
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    for p in cell.paragraphs:
+                        for key, val in replacements.items():
+                            if key in p.text:
+                                p.text = p.text.replace(key, val)
+
+        # C. Función para asegurar que la fecha del Excel sea DD-MM-AAAA sin hora
         def formatear_fecha(valor):
             if pd.isna(valor) or str(valor).strip() in ["", "NaT"]:
                 return ""
@@ -59,7 +67,7 @@ def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, tem
             except:
                 return str(valor).split(" ")[0]
 
-        # C. Llenar la tabla dinámica con las reexpediciones (tabla principal)
+        # D. Llenar la tabla dinámica con las reexpediciones
         tabla_dinamica = doc.tables[0]
         for _, reexp_row in grupo_rut.iterrows():
             cells = tabla_dinamica.add_row().cells
@@ -75,7 +83,7 @@ def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, tem
                 cells[4].text = str(nrm)
                 cells[5].text = str(fecha_gen)
 
-            # NUEVO: Centrar el texto, aplicar Negrita y tamaño 8 a cada celda insertada
+            # Centrar el texto, aplicar Negrita y tamaño 8 a cada celda insertada
             for cell in cells:
                 for paragraph in cell.paragraphs:
                     paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER # Centrado
