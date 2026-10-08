@@ -40,7 +40,7 @@ def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, tem
         for key, val in replacements.items():
             if key in p.text:
                 p.text = p.text.replace(key, val)
-                # Aplicar formato Tahoma, 9, Negrita al párrafo modificado
+                # Aplicar formato Tahoma, 9, Negrita
                 for run in p.runs:
                     run.font.name = 'Tahoma'
                     run.font.size = Pt(9)
@@ -93,14 +93,14 @@ def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, tem
                 cells[4].text = str(nrm)
                 cells[5].text = str(fecha_gen)
 
-            # Centrar el texto, aplicar Tahoma, tamaño 9 y Negrita a cada celda insertada
+            # Centrar el texto, aplicar Tahoma, tamaño 9 y Negrita
             for cell in cells:
                 for paragraph in cell.paragraphs:
-                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER # Centrado
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER 
                     for run in paragraph.runs:
                         run.font.name = 'Tahoma' 
                         run.font.size = Pt(9)   
-                        run.font.bold = True    # Negrita
+                        run.font.bold = True    
 
     os.makedirs("temp_docs", exist_ok=True)
     docx_path = f"temp_docs/{nrm}.docx"
@@ -146,12 +146,7 @@ if excel_file and template_file:
 
     resumen = resumen.rename(columns={'Razon_Social': 'Nombre de Empresa', 'Cantidad': 'Cantidad de Reexpediciones'})
 
-    # --- CALLBACKS PARA ACTUALIZAR TODA LA TABLA ---
-    def actualizar_iniciales():
-        nuevo_valor = st.session_state.global_iniciales
-        for r in resumen['RUT']:
-            st.session_state[f"gen_{r}"] = nuevo_valor
-
+    # --- CALLBACKS PARA ACTUALIZAR NRM ---
     def actualizar_nrm():
         inicio = st.session_state.global_nrm
         if inicio > 0:
@@ -168,7 +163,8 @@ if excel_file and template_file:
     with col_a:
         st.number_input("Inicio de MR (NRM Inicial)", min_value=0, value=0, step=1, key="global_nrm", on_change=actualizar_nrm)
     with col_b:
-        st.text_input("Iniciales de quien genera", key="global_iniciales", on_change=actualizar_iniciales)
+        # Se captura el valor directamente, sin necesidad de actualizar la tabla visualmente
+        global_gene = st.text_input("Iniciales de quien genera", key="global_iniciales")
 
     meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
     hoy = datetime.datetime.now()
@@ -182,25 +178,24 @@ if excel_file and template_file:
     st.divider()
     st.subheader("Registros Pendientes")
     
-    # --- TABLA DE REGISTROS ---
-    col_widths = [2.2, 1.2, 0.6, 1.2, 1.5, 0.8, 1.0, 1.0] 
+    # --- TABLA DE REGISTROS (Ajustada a 7 columnas) ---
+    col_widths = [2.2, 1.2, 0.6, 1.2, 1.5, 1.0, 1.0] 
     
-    h1, h2, h3, h4, h5, h6, h7, h8 = st.columns(col_widths)
+    h1, h2, h3, h4, h5, h6, h7 = st.columns(col_widths)
     h1.markdown("**Empresa**")
     h2.markdown("**RUT**")
     h3.markdown("**Cant.**")
     h4.markdown("**NRM**")
     h5.markdown("**Fecha Gen.**")
-    h6.markdown("**Gene**")
-    h7.markdown("**Acción**")
-    h8.markdown("**Archivo**")
+    h6.markdown("**Acción**")
+    h7.markdown("**Archivo**")
     
     st.markdown("---") 
 
     archivos_para_masivo = []
 
     for index, row in resumen.iterrows():
-        c1, c2, c3, c4, c5, c6, c7, c8 = st.columns(col_widths)
+        c1, c2, c3, c4, c5, c6, c7 = st.columns(col_widths)
         rut = row['RUT']
         
         c1.write(row['Nombre de Empresa'])
@@ -209,24 +204,23 @@ if excel_file and template_file:
         
         nrm = c4.text_input("NRM", key=f"nrm_{rut}", label_visibility="collapsed")
         fecha_gen = c5.text_input("Fecha", key=f"fec_{rut}", label_visibility="collapsed")
-        gene = c6.text_input("Gene", key=f"gen_{rut}", label_visibility="collapsed")
         
         if nrm:
             archivos_para_masivo.append({
                 "rut": rut,
                 "nrm": nrm,
                 "fecha_gen": fecha_gen,
-                "gene": gene,
                 "razon_social": row['Nombre de Empresa']
             })
 
         key_estado = f"file_data_{rut}"
         
-        with c7:
+        with c6:
             if st.button("⚙️ Generar", key=f"btn_gen_{rut}"):
                 if nrm: 
                     with st.spinner("⏳"):
-                        file_path, ext = procesar_documento(rut, nrm, fecha_gen, gene, row['Nombre de Empresa'], df, template_file)
+                        # Se pasa el global_gene directamente a la función
+                        file_path, ext = procesar_documento(rut, nrm, fecha_gen, global_gene, row['Nombre de Empresa'], df, template_file)
                         
                         with open(file_path, "rb") as f:
                             st.session_state[key_estado] = {
@@ -235,7 +229,7 @@ if excel_file and template_file:
                                 "mime": "application/pdf" if ext == "pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                             }
         
-        with c8:
+        with c7:
             if key_estado in st.session_state:
                 file_info = st.session_state[key_estado]
                 st.download_button(
@@ -255,9 +249,10 @@ if excel_file and template_file:
             generated_files = []
             
             for datos in archivos_para_masivo:
+                # Se pasa el global_gene directamente a la función
                 file_path, _ = procesar_documento(
                     datos['rut'], datos['nrm'], datos['fecha_gen'], 
-                    datos['gene'], datos['razon_social'], df, template_file
+                    global_gene, datos['razon_social'], df, template_file
                 )
                 generated_files.append(file_path)
             
