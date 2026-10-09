@@ -1,173 +1,265 @@
 import streamlit as st
 import pandas as pd
+from docx import Document
+from docx.shared import Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx2pdf import convert
+import os
+import zipfile
 import io
+import datetime
 
-# Configuración de página
-st.set_page_config(page_title="Reexpedicion Por Cumplir", layout="wide")
+# Configuración de la página
+st.set_page_config(page_title="Generador de Notificaciones de Reexpedición", layout="wide")
+st.title("Generador Masivo de Notificaciones (Reexpediciones)")
 
-# CSS personalizado para los bordes redondeados y naranjo candy en las métricas
-st.markdown("""
-<style>
-/* Apuntar al contenedor de las métricas en Streamlit */
-div[data-testid="stMetric"] {
-    border: 2px solid #FF8C00; /* Color naranjo candy */
-    border-radius: 15px;       /* Esquinas redondeadas */
-    padding: 15px;             /* Espacio interior para que no quede pegado al borde */
-   
-}
-</style>
-""", unsafe_allow_html=True)
+# --- FUNCION REUTILIZABLE PARA GENERAR EL DOCUMENTO ---
+def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, template_file):
+    grupo_rut = df_completo[df_completo['RUT'] == rut]
+    
+    correo = grupo_rut['CORREO_FINAL'].iloc[0] if 'CORREO_FINAL' in grupo_rut.columns else ""
+    tele = grupo_rut['TELE_FINAL'].iloc[0] if 'TELE_FINAL' in grupo_rut.columns else ""
 
-st.title("Reexpedicion Por Cumplir")
+    template_file.seek(0)
+    doc = Document(template_file)
+    
+    replacements = {
+        "[NOM_IMPOR]": str(razon_social),
+        "[RUT_IMP]": str(rut),
+        "[TELE]": str(tele),
+        "[CORREO]": str(correo),
+        "[NRM]": str(nrm),
+        "[FECHA_GEN]": str(fecha_gen),
+        "[FECH_GEN]": str(fecha_gen), 
+        "[GENE]": str(gene)
+    }
+    
+    # 1. Reemplazar en párrafos normales
+    for p in doc.paragraphs:
+        for key, val in replacements.items():
+            if key in p.text:
+                p.text = p.text.replace(key, val)
+                for run in p.runs:
+                    run.font.name = 'Tahoma'
+                    run.font.size = Pt(9)
+                    run.font.bold = True
+                
+    # 2. Operaciones dentro de las tablas
+    if doc.tables: 
+        for table in doc.tables:
+            for row in table.rows:
+                if any("[COD_RE]" in cell.text for cell in row.cells):
+                    row._element.getparent().remove(row._element) 
 
-# 1. Zona de carga de archivos
-col1, col2 = st.columns(2)
-with col1:
-    Zofri = st.file_uploader("Archivo Zofri", type=['xlsx', 'xls', 'csv'])
-with col2:
-    archivos_2 = st.file_uploader("Archivos Sirote", type=['xlsm', 'xlsx', 'csv'], accept_multiple_files=True)
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    for p in cell.paragraphs:
+                        for key, val in replacements.items():
+                            if key in p.text:
+                                p.text = p.text.replace(key, val)
+                                for run in p.runs:
+                                    run.font.name = 'Tahoma'
+                                    run.font.size = Pt(9)
+                                    run.font.bold = True
 
-# Función auxiliar robusta para leer CSV sin errores
-def leer_csv_robusto(archivo):
-    try:
-        archivo.seek(0)
-        return pd.read_csv(archivo, sep=None, engine='python')
-    except UnicodeDecodeError:
-        archivo.seek(0)
-        return pd.read_csv(archivo, encoding='latin-1', sep=None, engine='python')
+        def formatear_fecha(valor):
+            if pd.isna(valor) or str(valor).strip() in ["", "NaT"]:
+                return ""
+            try:
+                return pd.to_datetime(valor).strftime("%d-%m-%Y")
+            except:
+                return str(valor).split(" ")[0]
 
-# Función auxiliar para convertir DataFrame a Excel en memoria
-def generar_excel(df, nombre_hoja='Para cumplir'):
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name=nombre_hoja)
-    return output.getvalue()
-
-if Zofri and archivos_2:
-    try:
-        # 2. Carga y consolidación de datos
-        if Zofri.name.endswith('.csv'):
-            df1 = leer_csv_robusto(Zofri)
-        else:
-            df1 = pd.read_excel(Zofri)
-
-        lista_df2 = []
-
-        # Procesar todos los archivos subidos en el cuadro 2
-        for file in archivos_2:
-            nombre_archivo = file.name.lower()
-
-            # --- Lógica especial para el archivo de Punta Arenas ---
-            if 'puntaarenas' in nombre_archivo and nombre_archivo.endswith('.xlsx'):
-                df_temp = pd.read_excel(file, header=7, engine='openpyxl')
-
-                if 'Numero' in df_temp.columns:
-                    mapping = {
-                        'Numero': 'Reexpediciones',
-                        'Fecha Ingreso': 'Fecha Cierre',
-                        'Num_Int': 'N° MIC'
-                    }
-                    df_temp = df_temp.rename(columns=mapping)
-
-                    # Forzar formato de fecha corta (DD-MM-YYYY) sin horas
-                    if 'Fecha Cierre' in df_temp.columns:
-                        df_temp['Fecha Cierre'] = pd.to_datetime(df_temp['Fecha Cierre'], errors='coerce').dt.strftime('%d-%m-%Y').fillna(df_temp['Fecha Cierre'])
-
-                    df_temp['Aduana Destino'] = 'Punta Arenas'
-                    if 'Patente Tracto' not in df_temp.columns:
-                        df_temp['Patente Tracto'] = pd.NA
-                else:
-                    st.warning(f"El archivo {file.name} se detectó como Punta Arenas, pero no tiene la columna 'Numero' en la fila 8.")
-
-                lista_df2.append(df_temp)
-
-            # Procesar el resto de archivos normalmente
-            else:
-                if nombre_archivo.endswith('.csv'):
-                    df_temp = leer_csv_robusto(file)
-                else:
-                    df_temp = pd.read_excel(file, engine='openpyxl')
-                lista_df2.append(df_temp)
-
-        # Consolidar todo el universo de reexpediciones
-        df2 = pd.concat(lista_df2, ignore_index=True)
-
-        # Validaciones de columnas maestras
-        if 'documento_salida' not in df1.columns:
-            st.error("El Archivo 1 no contiene la columna 'documento_salida'.")
-        elif 'Reexpediciones' not in df2.columns:
-            st.error("Los archivos de comparación no contienen la columna 'Reexpediciones' (o 'Numero' en el caso de Punta Arenas).")
-        else:
-            # 3. Limpieza y Comparación
-            df1['doc_clean'] = df1['documento_salida'].astype(str).str.replace('-', '', regex=False).str.strip()
-            df2['reexp_clean'] = df2['Reexpediciones'].astype(str).str.replace('-', '', regex=False).str.strip()
-
-            df_match = pd.merge(df1, df2, left_on='doc_clean', right_on='reexp_clean', how='inner')
-
-            # Preparar DataFrames para exportación antes de mostrar las métricas
-            columnas_reporte = ['N° MIC', 'Aduana Destino', 'Fecha Cierre', 'Patente Tracto', 'Reexpediciones']
-            columnas_finales = [col for col in columnas_reporte if col in df_match.columns]
-
-            # DF 1: Todas las coincidencias
-            df_todas = df_match[columnas_finales].copy()
-            if 'Reexpediciones' in df_todas.columns:
-                df_todas['Reexpediciones'] = df_todas['Reexpediciones'].astype(str).str.replace('-', '', regex=False).str.strip()
-
-            # DF 2: Solo con Fecha de Cierre válida
-            df_con_fecha_export = df_todas.copy()
-            if 'Fecha Cierre' in df_con_fecha_export.columns:
-                df_con_fecha_export = df_con_fecha_export.dropna(subset=['Fecha Cierre'])
-                df_con_fecha_export = df_con_fecha_export[df_con_fecha_export['Fecha Cierre'].astype(str).str.strip() != '']
-                df_con_fecha_export = df_con_fecha_export[df_con_fecha_export['Fecha Cierre'].astype(str).str.strip().str.lower() != 'nan']
-                df_con_fecha_export = df_con_fecha_export[df_con_fecha_export['Fecha Cierre'].astype(str).str.strip().str.lower() != 'nat']
-
-            # Calcular el número para la métrica
-            if 'Fecha Cierre' in df_match.columns:
-                s_str = df_match['Fecha Cierre'].astype(str).str.strip()
-                s_low = s_str.str.lower()
-                n_con_fecha = int((df_match['Fecha Cierre'].notna() & (s_str != '') & (~s_low.isin(['nan', 'nat', 'none']))).sum())
-            else:
-                n_con_fecha = 0
-
-            # 4. Métricas y Botones de Descarga
-            st.divider()
-            m1, m2, m3 = st.columns(3)
+        tabla_dinamica = doc.tables[0]
+        for _, reexp_row in grupo_rut.iterrows():
+            cells = tabla_dinamica.add_row().cells
             
-            with m1:
-                st.metric("Universo de Comparación", len(df2))
+            if len(cells) >= 4: 
+                cells[0].text = str(reexp_row.get('REEXP.', ''))
+                cells[1].text = formatear_fecha(reexp_row.get('Fecha Documento/ Visación'))
+                cells[2].text = formatear_fecha(reexp_row.get('Fecha Control Salida'))
+                cells[3].text = str(reexp_row.get('Avanzada Aduana', ''))
+            
+            if len(cells) >= 6:
+                cells[4].text = str(nrm)
+                cells[5].text = str(fecha_gen)
+
+            for cell in cells:
+                for paragraph in cell.paragraphs:
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER 
+                    for run in paragraph.runs:
+                        run.font.name = 'Tahoma' 
+                        run.font.size = Pt(9)   
+                        run.font.bold = True    
+
+    os.makedirs("temp_docs", exist_ok=True)
+    docx_path = f"temp_docs/{nrm}.docx"
+    pdf_path = f"temp_docs/{nrm}.pdf"
+    doc.save(docx_path)
+    
+    try:
+        convert(docx_path, pdf_path)
+        return pdf_path, "pdf"
+    except Exception:
+        return docx_path, "docx"
+
+# ==========================================
+# ESTRUCTURA VISUAL EN CUADRÍCULA (3 COLUMNAS)
+# ==========================================
+col1, col2, col3 = st.columns([1.2, 1, 1.2], gap="large")
+
+with col1:
+    st.subheader("📂 1. Carga de Archivos")
+    excel_file = st.file_uploader("Archivo 1 (Excel de registros)", type=["xlsx"])
+    template_file = st.file_uploader("Archivo 2 (Plantilla base en .docx)", type=["docx"])
+
+if excel_file and template_file:
+    # Procesamiento inicial de datos
+    df = pd.read_excel(excel_file)
+    df.columns = df.columns.str.strip()
+    
+    if 'FONO 1' in df.columns:
+        df['TELE_FINAL'] = df['FONO 1']
+        if 'FONO 2' in df.columns: df['TELE_FINAL'] = df['TELE_FINAL'].fillna(df['FONO 2'])
+        if 'FONO 3' in df.columns: df['TELE_FINAL'] = df['TELE_FINAL'].fillna(df['FONO 3'])
+    else:
+        df['TELE_FINAL'] = "SIN FONO"
+
+    if 'CORREO 1' in df.columns:
+        df['CORREO_FINAL'] = df['CORREO 1']
+        if 'CORREO 2' in df.columns: df['CORREO_FINAL'] = df['CORREO_FINAL'].fillna(df['CORREO 2'])
+        if 'CORREO 3' in df.columns: df['CORREO_FINAL'] = df['CORREO_FINAL'].fillna(df['CORREO 3'])
+    else:
+        df['CORREO_FINAL'] = "SIN CORREO"
+
+    # Corrección de la columna 'Razón Social' aplicada aquí
+    resumen = df.groupby('RUT').agg(
+        Razon_Social=('Razón Social', 'first'),
+        Cantidad=('RUT', 'count')
+    ).reset_index()
+    resumen = resumen.rename(columns={'Razon_Social': 'Nombre de Empresa', 'Cantidad': 'Cantidad de Reexpediciones'})
+
+    def actualizar_nrm():
+        inicio = st.session_state.global_nrm
+        if inicio > 0:
+            for i, r in enumerate(resumen['RUT']):
+                st.session_state[f"nrm_{r}"] = f"MR-{(inicio + i):03d}"
+        else:
+            for r in resumen['RUT']:
+                st.session_state[f"nrm_{r}"] = ""
+
+    # Precarga de fechas en memoria
+    meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+    hoy = datetime.datetime.now()
+    fecha_actual_texto = f"{hoy.day:02d} de {meses[hoy.month - 1]} de {hoy.year}"
+    
+    for i, row in resumen.iterrows():
+        rut = row['RUT']
+        if f"fec_{rut}" not in st.session_state:
+            st.session_state[f"fec_{rut}"] = fecha_actual_texto
+
+    # Llenado de la Columna 2
+    with col2:
+        st.subheader("⚙️ 2. Configuración")
+        st.number_input("Inicio de MR (NRM Inicial)", min_value=0, value=0, step=1, key="global_nrm", on_change=actualizar_nrm)
+        global_gene = st.text_input("Iniciales de quien genera", key="global_iniciales")
+
+    # Llenado de la Columna 3
+    with col3:
+        st.subheader("📊 3. Resumen y Generación")
+        
+        # Cuadros de métricas
+        met1, met2 = st.columns(2)
+        met1.metric("Empresas Totales", len(resumen))
+        met2.metric("Reexp. Totales", int(resumen['Cantidad de Reexpediciones'].sum()))
+        
+        # Botón masivo trasladado arriba
+        st.write("") # Espaciador
+        if st.button("🚀 Generar Todo Masivamente", type="primary", use_container_width=True):
+            with st.spinner("Generando documentos masivos..."):
+                generated_files = []
                 
-            with m2:
-                st.metric("Coincidencias", len(df_match))
-                st.write("") # Pequeño espacio para separar la métrica del botón
+                # Se lee directamente de la memoria para generar sin depender de la tabla visual
+                for index, row in resumen.iterrows():
+                    rut = row['RUT']
+                    nrm_actual = st.session_state.get(f"nrm_{rut}", "")
+                    fecha_actual = st.session_state.get(f"fec_{rut}", fecha_actual_texto)
+                    
+                    if nrm_actual: 
+                        file_path, _ = procesar_documento(
+                            rut, nrm_actual, fecha_actual, global_gene, row['Nombre de Empresa'], df, template_file
+                        )
+                        generated_files.append(file_path)
                 
-                # Subcolumnas [1, 1] hacen que el botón ocupe la mitad izquierda
-                btn_col1, _ = st.columns([1, 1])
-                with btn_col1:
+                if generated_files:
+                    zip_buffer = io.BytesIO()
+                    with zipfile.ZipFile(zip_buffer, "w") as zip_file:
+                        for file_path in generated_files:
+                            zip_file.write(file_path, os.path.basename(file_path))
+                    
+                    st.success("¡Éxito!")
                     st.download_button(
-                        label="📥 Generar",
-                        data=generar_excel(df_todas),
-                        file_name="Coincidencias_Totales.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True
-                    )
-                
-            with m3:
-                st.metric("Reexpediciones (con Fecha de Cierre)", n_con_fecha)
-                st.write("") # Pequeño espacio para separar la métrica del botón
-                
-                # Subcolumnas [1, 1] hacen que el botón ocupe la mitad izquierda
-                btn_col2, _ = st.columns([1, 1])
-                with btn_col2:
-                    st.download_button(
-                        label="📥 Genera documento para cumplir",
-                        data=generar_excel(df_con_fecha_export),
-                        file_name="Reexpediciones para cumplir.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        type="primary",
+                        label="📥 Descargar ZIP Completo",
+                        data=zip_buffer.getvalue(),
+                        file_name="Notificaciones_Generadas.zip",
+                        mime="application/zip",
                         use_container_width=True
                     )
 
-    except Exception as e:
-        st.error(f"Error procesando los datos: {e}")
-else:
-    st.info("Sube el Archivo 1 y los Archivos 2 de comparación para iniciar el análisis solo sera procesados por lo que no quedara registro en alguna base de datos.")
+    st.divider()
+    st.subheader("📋 Registros Pendientes")
+    
+    # ==========================================
+    # TABLA CON BORDE PLOMO (Contenedor)
+    # ==========================================
+    with st.container(border=True):
+        col_widths = [2.2, 1.2, 0.6, 1.2, 1.5, 1.0, 1.0] 
+        
+        h1, h2, h3, h4, h5, h6, h7 = st.columns(col_widths)
+        h1.markdown("**Empresa**")
+        h2.markdown("**RUT**")
+        h3.markdown("**Cant.**")
+        h4.markdown("**NRM**")
+        h5.markdown("**Fecha Gen.**")
+        h6.markdown("**Acción**")
+        h7.markdown("**Archivo**")
+        
+        st.markdown("---") 
+
+        for index, row in resumen.iterrows():
+            c1, c2, c3, c4, c5, c6, c7 = st.columns(col_widths)
+            rut = row['RUT']
+            
+            c1.write(row['Nombre de Empresa'])
+            c2.write(rut)
+            c3.write(str(row['Cantidad de Reexpediciones']))
+            
+            nrm = c4.text_input("NRM", key=f"nrm_{rut}", label_visibility="collapsed")
+            fecha_gen = c5.text_input("Fecha", key=f"fec_{rut}", label_visibility="collapsed")
+            
+            key_estado = f"file_data_{rut}"
+            
+            with c6:
+                if st.button("⚙️ Generar", key=f"btn_gen_{rut}"):
+                    if nrm: 
+                        with st.spinner("⏳"):
+                            file_path, ext = procesar_documento(rut, nrm, fecha_gen, global_gene, row['Nombre de Empresa'], df, template_file)
+                            
+                            with open(file_path, "rb") as f:
+                                st.session_state[key_estado] = {
+                                    "bytes": f.read(),
+                                    "name": os.path.basename(file_path),
+                                    "mime": "application/pdf" if ext == "pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                }
+            
+            with c7:
+                if key_estado in st.session_state:
+                    file_info = st.session_state[key_estado]
+                    st.download_button(
+                        label="📥 PDF",
+                        data=file_info["bytes"],
+                        file_name=file_info["name"],
+                        mime=file_info["mime"],
+                        key=f"btn_dl_{rut}"
+                    )
