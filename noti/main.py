@@ -15,14 +15,10 @@ st.set_page_config(page_title="Generador de Notificaciones de Reexpedición", la
 # Estilos visuales personalizados
 st.markdown("""
 <style>
-/* Botones a la mitad del ancho y alineados a la izquierda */
-div.stButton > button {
-    width: 50% !important;
-    display: block !important;
-    margin-right: auto !important;
-}
-div.stDownloadButton > button {
-    width: 50% !important;
+/* Botones alineados a la izquierda, mínimo mitad de ancho pero expansibles si el texto es largo */
+div.stButton > button, div.stDownloadButton > button {
+    min-width: 50% !important;
+    width: max-content !important;
     display: block !important;
     margin-right: auto !important;
 }
@@ -195,7 +191,7 @@ if excel_file and template_file:
         global_gene = st.text_input("Iniciales de quien genera", key="global_iniciales")
 
     # ==========================================
-    # 3. BANNERS DE RESUMEN Y GENERACIÓN MASIVA
+    # 3. BANNERS DE RESUMEN Y GENERACIÓN MASIVA (EN LA MISMA LÍNEA)
     # ==========================================
     st.divider()
     st.subheader("📊 3. Resumen y Generación")
@@ -206,41 +202,47 @@ if excel_file and template_file:
     # Calcular documentos válidos a generar
     docs_a_generar = sum(1 for r in resumen['RUT'] if st.session_state.get(f"nrm_{r}", "").strip())
 
-    met1, met2, met3 = st.columns(3)
-    met1.metric("Empresas Totales", total_empresas)
-    met2.metric("Reexpediciones Procesadas", total_reexpediciones)
-    met3.metric("Documentos a Generar", docs_a_generar)
-
-    st.write("") 
+    # Se crean 4 columnas: 3 para los banners y 1 para el botón
+    met1, met2, met3, btn_col = st.columns([1, 1, 1, 1.2])
     
-    if st.button("🚀 Generar Todos los Documentos Masivamente", type="primary"):
-        with st.spinner("Procesando documentos..."):
-            generated_files = []
-            
-            for index, row in resumen.iterrows():
-                rut = row['RUT']
-                nrm_actual = st.session_state.get(f"nrm_{rut}", "")
-                fecha_actual = st.session_state.get(f"fec_{rut}", fecha_actual_texto)
+    with met1:
+        st.metric("Empresas Totales", total_empresas)
+    with met2:
+        st.metric("Reexpediciones Procesadas", total_reexpediciones)
+    with met3:
+        st.metric("Documentos a Generar", docs_a_generar)
+
+    with btn_col:
+        st.write("") # Espaciador para centrar el botón verticalmente con las métricas
+        st.write("")
+        if st.button("🚀 Generar Masivamente", type="primary"):
+            with st.spinner("Procesando documentos..."):
+                generated_files = []
                 
-                if nrm_actual.strip(): 
-                    file_path, _ = procesar_documento(
-                        rut, nrm_actual, fecha_actual, global_gene, row['Nombre de Empresa'], df, template_file
+                for index, row in resumen.iterrows():
+                    rut = row['RUT']
+                    nrm_actual = st.session_state.get(f"nrm_{rut}", "")
+                    fecha_actual = st.session_state.get(f"fec_{rut}", fecha_actual_texto)
+                    
+                    if nrm_actual.strip(): 
+                        file_path, _ = procesar_documento(
+                            rut, nrm_actual, fecha_actual, global_gene, row['Nombre de Empresa'], df, template_file
+                        )
+                        generated_files.append(file_path)
+                
+                if generated_files:
+                    zip_buffer = io.BytesIO()
+                    with zipfile.ZipFile(zip_buffer, "w") as zip_file:
+                        for file_path in generated_files:
+                            zip_file.write(file_path, os.path.basename(file_path))
+                    
+                    st.success("¡Documentos generados con éxito!")
+                    st.download_button(
+                        label="📥 Descargar ZIP Completo",
+                        data=zip_buffer.getvalue(),
+                        file_name="Notificaciones_Generadas.zip",
+                        mime="application/zip"
                     )
-                    generated_files.append(file_path)
-            
-            if generated_files:
-                zip_buffer = io.BytesIO()
-                with zipfile.ZipFile(zip_buffer, "w") as zip_file:
-                    for file_path in generated_files:
-                        zip_file.write(file_path, os.path.basename(file_path))
-                
-                st.success("¡Documentos generados con éxito!")
-                st.download_button(
-                    label="📥 Descargar ZIP Completo",
-                    data=zip_buffer.getvalue(),
-                    file_name="Notificaciones_Generadas.zip",
-                    mime="application/zip"
-                )
 
     # ==========================================
     # 4. TABLA DE REGISTROS PENDIENTES
@@ -249,7 +251,8 @@ if excel_file and template_file:
     st.subheader("📋 Registros Pendientes")
     
     with st.container(border=True):
-        col_widths = [2.2, 1.2, 0.6, 1.2, 1.5, 1.0, 1.0] 
+        # Se ha aumentado el ancho de la última columna (1.3) para que no oculte el botón
+        col_widths = [2.2, 1.2, 0.6, 1.2, 1.5, 1.0, 1.3] 
         
         h1, h2, h3, h4, h5, h6, h7 = st.columns(col_widths)
         h1.markdown("**Empresa**")
