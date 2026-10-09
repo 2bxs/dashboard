@@ -3,32 +3,30 @@ import pandas as pd
 from docx import Document
 from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx2pdf import convert
 import os
 import zipfile
 import io
 import datetime
+import platform
+import subprocess
 
 # Configuración de la página
 st.set_page_config(page_title="Generador de Notificaciones de Reexpedición", layout="wide")
 
-# Estilos visuales personalizados
+# Estilos visuales
 st.markdown("""
 <style>
-/* Botones alineados a la izquierda, mínimo mitad de ancho pero expansibles si el texto es largo */
 div.stButton > button, div.stDownloadButton > button {
     min-width: 50% !important;
     width: max-content !important;
     display: block !important;
     margin-right: auto !important;
 }
-/* Métricas con bordes redondeados y color naranjo candy */
 [data-testid="metric-container"] {
     border: 2px solid #FF8C00 !important;
     border-radius: 15px !important;
     padding: 15px !important;
 }
-/* Separadores visuales naranjo candy */
 hr {
     border-bottom: 2px solid #FF8C00 !important;
 }
@@ -36,6 +34,20 @@ hr {
 """, unsafe_allow_html=True)
 
 st.title("Generador Masivo de Notificaciones (Reexpediciones)")
+
+# --- FUNCION INTELIGENTE DE CONVERSIÓN ---
+def convertir_a_pdf(docx_path, output_dir, pdf_path):
+    if platform.system() == "Windows":
+        # Usa MS Word si estás en tu PC local con Windows
+        from docx2pdf import convert
+        convert(docx_path, pdf_path)
+    else:
+        # Usa LibreOffice si está desplegado en la nube de Streamlit (Linux)
+        comando = [
+            "libreoffice", "--headless", "--convert-to", "pdf", 
+            docx_path, "--outdir", output_dir
+        ]
+        subprocess.run(comando, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 # --- FUNCION REUTILIZABLE PARA GENERAR EL DOCUMENTO ---
 def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, template_file):
@@ -121,7 +133,7 @@ def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, tem
     doc.save(docx_path)
     
     try:
-        convert(docx_path, pdf_path)
+        convertir_a_pdf(docx_path, "temp_docs", pdf_path)
         return pdf_path, "pdf"
     except Exception:
         return docx_path, "docx"
@@ -160,7 +172,6 @@ if excel_file and template_file:
     ).reset_index()
     resumen = resumen.rename(columns={'Razon_Social': 'Nombre de Empresa', 'Cantidad': 'Cantidad de Reexpediciones'})
 
-    # Funciones de actualización
     def actualizar_nrm():
         inicio = st.session_state.global_nrm
         if inicio > 0:
@@ -191,14 +202,13 @@ if excel_file and template_file:
         global_gene = st.text_input("Iniciales de quien genera", key="global_iniciales")
 
     # ==========================================
-    # 3. BANNERS DE RESUMEN Y GENERACIÓN MASIVA (EN LA MISMA LÍNEA)
+    # 3. BANNERS DE RESUMEN Y GENERACIÓN MASIVA
     # ==========================================
     st.divider()
     st.subheader("📊 3. Resumen y Generación")
     
     total_empresas = len(resumen)
     total_reexpediciones = int(resumen['Cantidad de Reexpediciones'].sum())
-    
     docs_a_generar = sum(1 for r in resumen['RUT'] if st.session_state.get(f"nrm_{r}", "").strip())
 
     met1, met2, met3, btn_col = st.columns([1, 1, 1, 1.2])
@@ -315,24 +325,20 @@ if archivos_docx:
             pdf_convertidos = []
             
             for archivo in archivos_docx:
-                # 1. Guardar el archivo Word subido en una ruta temporal
                 docx_path = os.path.join("temp_convert", archivo.name)
                 with open(docx_path, "wb") as f:
                     f.write(archivo.getbuffer())
                 
-                # 2. Generar el nombre para el nuevo archivo PDF
                 nombre_base = os.path.splitext(archivo.name)[0]
                 pdf_path = os.path.join("temp_convert", f"{nombre_base}.pdf")
                 
-                # 3. Realizar la conversión
                 try:
-                    convert(docx_path, pdf_path)
+                    convertir_a_pdf(docx_path, "temp_convert", pdf_path)
                     if os.path.exists(pdf_path):
                         pdf_convertidos.append(pdf_path)
                 except Exception as e:
-                    st.error(f"Ocurrió un error convirtiendo {archivo.name}")
+                    st.error(f"Error convirtiendo {archivo.name}. Asegúrate de tener el archivo packages.txt con libreoffice si estás en la nube.")
             
-            # 4. Comprimir los archivos resultantes si la conversión fue exitosa
             if pdf_convertidos:
                 zip_buffer_conv = io.BytesIO()
                 with zipfile.ZipFile(zip_buffer_conv, "w") as zip_file:
