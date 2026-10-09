@@ -11,6 +11,34 @@ import datetime
 
 # Configuración de la página
 st.set_page_config(page_title="Generador de Notificaciones de Reexpedición", layout="wide")
+
+# Estilos visuales personalizados
+st.markdown("""
+<style>
+/* Botones a la mitad del ancho y alineados a la izquierda */
+div.stButton > button {
+    width: 50% !important;
+    display: block !important;
+    margin-right: auto !important;
+}
+div.stDownloadButton > button {
+    width: 50% !important;
+    display: block !important;
+    margin-right: auto !important;
+}
+/* Métricas con bordes redondeados y color naranjo candy */
+[data-testid="metric-container"] {
+    border: 2px solid #FF8C00 !important;
+    border-radius: 15px !important;
+    padding: 15px !important;
+}
+/* Separadores visuales naranjo candy */
+hr {
+    border-bottom: 2px solid #FF8C00 !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 st.title("Generador Masivo de Notificaciones (Reexpediciones)")
 
 # --- FUNCION REUTILIZABLE PARA GENERAR EL DOCUMENTO ---
@@ -34,7 +62,6 @@ def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, tem
         "[GENE]": str(gene)
     }
     
-    # 1. Reemplazar en párrafos normales
     for p in doc.paragraphs:
         for key, val in replacements.items():
             if key in p.text:
@@ -44,7 +71,6 @@ def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, tem
                     run.font.size = Pt(9)
                     run.font.bold = True
                 
-    # 2. Operaciones dentro de las tablas
     if doc.tables: 
         for table in doc.tables:
             for row in table.rows:
@@ -105,17 +131,16 @@ def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, tem
         return docx_path, "docx"
 
 # ==========================================
-# ESTRUCTURA VISUAL EN CUADRÍCULA (3 COLUMNAS)
+# 1. CARGA DE ARCHIVOS
 # ==========================================
-col1, col2, col3 = st.columns([1.2, 1, 1.2], gap="large")
-
+st.subheader("📂 1. Carga de Archivos")
+col1, col2 = st.columns(2)
 with col1:
-    st.subheader("📂 1. Carga de Archivos")
     excel_file = st.file_uploader("Archivo 1 (Excel de registros)", type=["xlsx"])
+with col2:
     template_file = st.file_uploader("Archivo 2 (Plantilla base en .docx)", type=["docx"])
 
 if excel_file and template_file:
-    # Procesamiento inicial de datos
     df = pd.read_excel(excel_file)
     df.columns = df.columns.str.strip()
     
@@ -133,13 +158,13 @@ if excel_file and template_file:
     else:
         df['CORREO_FINAL'] = "SIN CORREO"
 
-    # Corrección de la columna 'Razón Social' aplicada aquí
     resumen = df.groupby('RUT').agg(
         Razon_Social=('Razón Social', 'first'),
         Cantidad=('RUT', 'count')
     ).reset_index()
     resumen = resumen.rename(columns={'Razon_Social': 'Nombre de Empresa', 'Cantidad': 'Cantidad de Reexpediciones'})
 
+    # Funciones de actualización
     def actualizar_nrm():
         inicio = st.session_state.global_nrm
         if inicio > 0:
@@ -149,7 +174,6 @@ if excel_file and template_file:
             for r in resumen['RUT']:
                 st.session_state[f"nrm_{r}"] = ""
 
-    # Precarga de fechas en memoria
     meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
     hoy = datetime.datetime.now()
     fecha_actual_texto = f"{hoy.day:02d} de {meses[hoy.month - 1]} de {hoy.year}"
@@ -159,60 +183,71 @@ if excel_file and template_file:
         if f"fec_{rut}" not in st.session_state:
             st.session_state[f"fec_{rut}"] = fecha_actual_texto
 
-    # Llenado de la Columna 2
-    with col2:
-        st.subheader("⚙️ 2. Configuración")
+    # ==========================================
+    # 2. CONFIGURACIÓN AUTOMÁTICA
+    # ==========================================
+    st.divider()
+    st.subheader("⚙️ 2. Configuración")
+    col_a, col_b = st.columns(2)
+    with col_a:
         st.number_input("Inicio de MR (NRM Inicial)", min_value=0, value=0, step=1, key="global_nrm", on_change=actualizar_nrm)
+    with col_b:
         global_gene = st.text_input("Iniciales de quien genera", key="global_iniciales")
 
-    # Llenado de la Columna 3
-    with col3:
-        st.subheader("📊 3. Resumen y Generación")
-        
-        # Cuadros de métricas
-        met1, met2 = st.columns(2)
-        met1.metric("Empresas Totales", len(resumen))
-        met2.metric("Reexp. Totales", int(resumen['Cantidad de Reexpediciones'].sum()))
-        
-        # Botón masivo trasladado arriba
-        st.write("") # Espaciador
-        if st.button("🚀 Generar Todo Masivamente", type="primary", use_container_width=True):
-            with st.spinner("Generando documentos masivos..."):
-                generated_files = []
-                
-                # Se lee directamente de la memoria para generar sin depender de la tabla visual
-                for index, row in resumen.iterrows():
-                    rut = row['RUT']
-                    nrm_actual = st.session_state.get(f"nrm_{rut}", "")
-                    fecha_actual = st.session_state.get(f"fec_{rut}", fecha_actual_texto)
-                    
-                    if nrm_actual: 
-                        file_path, _ = procesar_documento(
-                            rut, nrm_actual, fecha_actual, global_gene, row['Nombre de Empresa'], df, template_file
-                        )
-                        generated_files.append(file_path)
-                
-                if generated_files:
-                    zip_buffer = io.BytesIO()
-                    with zipfile.ZipFile(zip_buffer, "w") as zip_file:
-                        for file_path in generated_files:
-                            zip_file.write(file_path, os.path.basename(file_path))
-                    
-                    st.success("¡Éxito!")
-                    st.download_button(
-                        label="📥 Descargar ZIP Completo",
-                        data=zip_buffer.getvalue(),
-                        file_name="Notificaciones_Generadas.zip",
-                        mime="application/zip",
-                        use_container_width=True
-                    )
+    # ==========================================
+    # 3. BANNERS DE RESUMEN Y GENERACIÓN MASIVA
+    # ==========================================
+    st.divider()
+    st.subheader("📊 3. Resumen y Generación")
+    
+    total_empresas = len(resumen)
+    total_reexpediciones = int(resumen['Cantidad de Reexpediciones'].sum())
+    
+    # Calcular documentos válidos a generar
+    docs_a_generar = sum(1 for r in resumen['RUT'] if st.session_state.get(f"nrm_{r}", "").strip())
 
+    met1, met2, met3 = st.columns(3)
+    met1.metric("Empresas Totales", total_empresas)
+    met2.metric("Reexpediciones Procesadas", total_reexpediciones)
+    met3.metric("Documentos a Generar", docs_a_generar)
+
+    st.write("") 
+    
+    if st.button("🚀 Generar Todos los Documentos Masivamente", type="primary"):
+        with st.spinner("Procesando documentos..."):
+            generated_files = []
+            
+            for index, row in resumen.iterrows():
+                rut = row['RUT']
+                nrm_actual = st.session_state.get(f"nrm_{rut}", "")
+                fecha_actual = st.session_state.get(f"fec_{rut}", fecha_actual_texto)
+                
+                if nrm_actual.strip(): 
+                    file_path, _ = procesar_documento(
+                        rut, nrm_actual, fecha_actual, global_gene, row['Nombre de Empresa'], df, template_file
+                    )
+                    generated_files.append(file_path)
+            
+            if generated_files:
+                zip_buffer = io.BytesIO()
+                with zipfile.ZipFile(zip_buffer, "w") as zip_file:
+                    for file_path in generated_files:
+                        zip_file.write(file_path, os.path.basename(file_path))
+                
+                st.success("¡Documentos generados con éxito!")
+                st.download_button(
+                    label="📥 Descargar ZIP Completo",
+                    data=zip_buffer.getvalue(),
+                    file_name="Notificaciones_Generadas.zip",
+                    mime="application/zip"
+                )
+
+    # ==========================================
+    # 4. TABLA DE REGISTROS PENDIENTES
+    # ==========================================
     st.divider()
     st.subheader("📋 Registros Pendientes")
     
-    # ==========================================
-    # TABLA CON BORDE PLOMO (Contenedor)
-    # ==========================================
     with st.container(border=True):
         col_widths = [2.2, 1.2, 0.6, 1.2, 1.5, 1.0, 1.0] 
         
