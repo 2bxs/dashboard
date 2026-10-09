@@ -171,3 +171,178 @@ if excel_file and template_file:
                 st.session_state[f"nrm_{r}"] = ""
 
     meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+    hoy = datetime.datetime.now()
+    fecha_actual_texto = f"{hoy.day:02d} de {meses[hoy.month - 1]} de {hoy.year}"
+    
+    for i, row in resumen.iterrows():
+        rut = row['RUT']
+        if f"fec_{rut}" not in st.session_state:
+            st.session_state[f"fec_{rut}"] = fecha_actual_texto
+
+    # ==========================================
+    # 2. CONFIGURACIÓN AUTOMÁTICA
+    # ==========================================
+    st.divider()
+    st.subheader("⚙️ 2. Configuración")
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.number_input("Inicio de MR (NRM Inicial)", min_value=0, value=0, step=1, key="global_nrm", on_change=actualizar_nrm)
+    with col_b:
+        global_gene = st.text_input("Iniciales de quien genera", key="global_iniciales")
+
+    # ==========================================
+    # 3. BANNERS DE RESUMEN Y GENERACIÓN MASIVA (EN LA MISMA LÍNEA)
+    # ==========================================
+    st.divider()
+    st.subheader("📊 3. Resumen y Generación")
+    
+    total_empresas = len(resumen)
+    total_reexpediciones = int(resumen['Cantidad de Reexpediciones'].sum())
+    
+    docs_a_generar = sum(1 for r in resumen['RUT'] if st.session_state.get(f"nrm_{r}", "").strip())
+
+    met1, met2, met3, btn_col = st.columns([1, 1, 1, 1.2])
+    
+    with met1:
+        st.metric("Empresas Totales", total_empresas)
+    with met2:
+        st.metric("Reexpediciones Procesadas", total_reexpediciones)
+    with met3:
+        st.metric("Documentos a Generar", docs_a_generar)
+
+    with btn_col:
+        st.write("") 
+        st.write("")
+        if st.button("🚀 Generar Masivamente", type="primary"):
+            with st.spinner("Procesando documentos..."):
+                generated_files = []
+                
+                for index, row in resumen.iterrows():
+                    rut = row['RUT']
+                    nrm_actual = st.session_state.get(f"nrm_{rut}", "")
+                    fecha_actual = st.session_state.get(f"fec_{rut}", fecha_actual_texto)
+                    
+                    if nrm_actual.strip(): 
+                        file_path, _ = procesar_documento(
+                            rut, nrm_actual, fecha_actual, global_gene, row['Nombre de Empresa'], df, template_file
+                        )
+                        generated_files.append(file_path)
+                
+                if generated_files:
+                    zip_buffer = io.BytesIO()
+                    with zipfile.ZipFile(zip_buffer, "w") as zip_file:
+                        for file_path in generated_files:
+                            zip_file.write(file_path, os.path.basename(file_path))
+                    
+                    st.success("¡Documentos generados con éxito!")
+                    st.download_button(
+                        label="📥 Descargar ZIP Completo",
+                        data=zip_buffer.getvalue(),
+                        file_name="Notificaciones_Generadas.zip",
+                        mime="application/zip"
+                    )
+
+    # ==========================================
+    # 4. TABLA DE REGISTROS PENDIENTES
+    # ==========================================
+    st.divider()
+    st.subheader("📋 Registros Pendientes")
+    
+    with st.container(border=True):
+        col_widths = [2.2, 1.2, 0.6, 1.2, 1.5, 1.0, 1.3] 
+        
+        h1, h2, h3, h4, h5, h6, h7 = st.columns(col_widths)
+        h1.markdown("**Empresa**")
+        h2.markdown("**RUT**")
+        h3.markdown("**Cant.**")
+        h4.markdown("**NRM**")
+        h5.markdown("**Fecha Gen.**")
+        h6.markdown("**Acción**")
+        h7.markdown("**Archivo**")
+        
+        st.markdown("---") 
+
+        for index, row in resumen.iterrows():
+            c1, c2, c3, c4, c5, c6, c7 = st.columns(col_widths)
+            rut = row['RUT']
+            
+            c1.write(row['Nombre de Empresa'])
+            c2.write(rut)
+            c3.write(str(row['Cantidad de Reexpediciones']))
+            
+            nrm = c4.text_input("NRM", key=f"nrm_{rut}", label_visibility="collapsed")
+            fecha_gen = c5.text_input("Fecha", key=f"fec_{rut}", label_visibility="collapsed")
+            
+            key_estado = f"file_data_{rut}"
+            
+            with c6:
+                if st.button("⚙️ Generar", key=f"btn_gen_{rut}"):
+                    if nrm: 
+                        with st.spinner("⏳"):
+                            file_path, ext = procesar_documento(rut, nrm, fecha_gen, global_gene, row['Nombre de Empresa'], df, template_file)
+                            
+                            with open(file_path, "rb") as f:
+                                st.session_state[key_estado] = {
+                                    "bytes": f.read(),
+                                    "name": os.path.basename(file_path),
+                                    "mime": "application/pdf" if ext == "pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                }
+            
+            with c7:
+                if key_estado in st.session_state:
+                    file_info = st.session_state[key_estado]
+                    st.download_button(
+                        label="📥 PDF",
+                        data=file_info["bytes"],
+                        file_name=file_info["name"],
+                        mime=file_info["mime"],
+                        key=f"btn_dl_{rut}"
+                    )
+
+# ==========================================
+# 5. CONVERTIDOR MASIVO INDEPENDIENTE DE DOCX A PDF
+# ==========================================
+st.divider()
+st.subheader("🔄 5. Convertidor de Word a PDF")
+st.caption("Sube múltiples archivos en formato .docx para transformarlos en PDF conservando sus nombres originales.")
+
+archivos_docx = st.file_uploader("Sube tus documentos Word", type=["docx"], accept_multiple_files=True)
+
+if archivos_docx:
+    if st.button("🔄 Convertir Archivos a PDF", type="primary"):
+        with st.spinner("Convirtiendo documentos... esto puede tardar unos segundos."):
+            os.makedirs("temp_convert", exist_ok=True)
+            pdf_convertidos = []
+            
+            for archivo in archivos_docx:
+                # 1. Guardar el archivo Word subido en una ruta temporal
+                docx_path = os.path.join("temp_convert", archivo.name)
+                with open(docx_path, "wb") as f:
+                    f.write(archivo.getbuffer())
+                
+                # 2. Generar el nombre para el nuevo archivo PDF
+                nombre_base = os.path.splitext(archivo.name)[0]
+                pdf_path = os.path.join("temp_convert", f"{nombre_base}.pdf")
+                
+                # 3. Realizar la conversión
+                try:
+                    convert(docx_path, pdf_path)
+                    if os.path.exists(pdf_path):
+                        pdf_convertidos.append(pdf_path)
+                except Exception as e:
+                    st.error(f"Ocurrió un error convirtiendo {archivo.name}")
+            
+            # 4. Comprimir los archivos resultantes si la conversión fue exitosa
+            if pdf_convertidos:
+                zip_buffer_conv = io.BytesIO()
+                with zipfile.ZipFile(zip_buffer_conv, "w") as zip_file:
+                    for pdf_file in pdf_convertidos:
+                        zip_file.write(pdf_file, os.path.basename(pdf_file))
+                
+                st.success(f"¡Se convirtieron {len(pdf_convertidos)} archivos con éxito!")
+                st.download_button(
+                    label="📥 Descargar PDFs en archivo ZIP",
+                    data=zip_buffer_conv.getvalue(),
+                    file_name="Documentos_Convertidos_a_PDF.zip",
+                    mime="application/zip"
+                )
