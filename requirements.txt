@@ -1,5 +1,4 @@
 streamlit 
 pandas 
 python-docx
-libreoffice-java-common
 docx2pdf
