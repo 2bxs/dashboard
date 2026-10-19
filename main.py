@@ -13,7 +13,6 @@ div[data-testid="stMetric"] {
     border: 2px solid #FF8C00; /* Color naranjo candy */
     border-radius: 15px;       /* Esquinas redondeadas */
     padding: 15px;             /* Espacio interior para que no quede pegado al borde */
-   
 }
 </style>
 """, unsafe_allow_html=True)
@@ -79,6 +78,7 @@ if Zofri and archivos_2:
                 else:
                     st.warning(f"El archivo {file.name} se detectó como Punta Arenas, pero no tiene la columna 'Numero' en la fila 8.")
 
+                df_temp['Archivo Origen'] = file.name
                 lista_df2.append(df_temp)
 
             # Procesar el resto de archivos normalmente
@@ -87,6 +87,7 @@ if Zofri and archivos_2:
                     df_temp = leer_csv_robusto(file)
                 else:
                     df_temp = pd.read_excel(file, engine='openpyxl')
+                df_temp['Archivo Origen'] = file.name
                 lista_df2.append(df_temp)
 
         # Consolidar todo el universo de reexpediciones
@@ -105,7 +106,7 @@ if Zofri and archivos_2:
             df_match = pd.merge(df1, df2, left_on='doc_clean', right_on='reexp_clean', how='inner')
 
             # Preparar DataFrames para exportación antes de mostrar las métricas
-            columnas_reporte = ['N° MIC', 'Aduana Destino', 'Fecha Cierre', 'Patente Tracto', 'Reexpediciones']
+            columnas_reporte = ['N° MIC', 'Aduana Destino', 'Fecha Cierre', 'Patente Tracto', 'Reexpediciones', 'Archivo Origen']
             columnas_finales = [col for col in columnas_reporte if col in df_match.columns]
 
             # DF 1: Todas las coincidencias
@@ -121,25 +122,61 @@ if Zofri and archivos_2:
                 df_con_fecha_export = df_con_fecha_export[df_con_fecha_export['Fecha Cierre'].astype(str).str.strip().str.lower() != 'nan']
                 df_con_fecha_export = df_con_fecha_export[df_con_fecha_export['Fecha Cierre'].astype(str).str.strip().str.lower() != 'nat']
 
-            # Calcular el número para la métrica
+            # Máscara booleana: ¿la fila tiene Fecha Cierre válida?
             if 'Fecha Cierre' in df_match.columns:
                 s_str = df_match['Fecha Cierre'].astype(str).str.strip()
                 s_low = s_str.str.lower()
-                n_con_fecha = int((df_match['Fecha Cierre'].notna() & (s_str != '') & (~s_low.isin(['nan', 'nat', 'none']))).sum())
+                mask_fecha = df_match['Fecha Cierre'].notna() & (s_str != '') & (~s_low.isin(['nan', 'nat', 'none']))
             else:
-                n_con_fecha = 0
+                mask_fecha = pd.Series(False, index=df_match.index)
 
-            # 4. Métricas y Botones de Descarga
+            n_con_fecha = int(mask_fecha.sum())
+
+            # 3.1 Resumen: cuántas reexpediciones por cumplir corresponden a cada archivo
+            df_resumen = None
+            if 'Archivo Origen' in df_match.columns:
+                df_resumen = (
+                    df_match.assign(_con_fecha=mask_fecha)
+                    .groupby('Archivo Origen')
+                    .agg(Coincidencias=('_con_fecha', 'size'),
+                         Por_Cumplir=('_con_fecha', 'sum'))
+                    .reset_index()
+                    .rename(columns={'Archivo Origen': 'Archivo', 'Por_Cumplir': 'Por Cumplir'})
+                    .sort_values('Por Cumplir', ascending=False)
+                )
+
+                # Fila de total
+                total = pd.DataFrame([{
+                    'Archivo': 'TOTAL',
+                    'Coincidencias': int(df_resumen['Coincidencias'].sum()),
+                    'Por Cumplir': int(df_resumen['Por Cumplir'].sum())
+                }])
+                df_resumen = pd.concat([df_resumen, total], ignore_index=True)
+
+            # 4. Tabla resumen por archivo
+            if df_resumen is not None:
+                st.divider()
+                st.subheader("📑 Reexpediciones por cumplir por archivo")
+                st.dataframe(df_resumen, use_container_width=True, hide_index=True)
+
+                st.download_button(
+                    label="📥 Descargar resumen por archivo",
+                    data=generar_excel(df_resumen.drop(index=df_resumen.index[-1]), nombre_hoja='Por archivo'),
+                    file_name="Resumen_por_archivo.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+
+            # 5. Métricas y Botones de Descarga
             st.divider()
             m1, m2, m3 = st.columns(3)
-            
+
             with m1:
                 st.metric("Universo de Comparación", len(df2))
-                
+
             with m2:
                 st.metric("Coincidencias", len(df_match))
-                st.write("") # Pequeño espacio para separar la métrica del botón
-                
+                st.write("")  # Pequeño espacio para separar la métrica del botón
+
                 # Subcolumnas [1, 1] hacen que el botón ocupe la mitad izquierda
                 btn_col1, _ = st.columns([1, 1])
                 with btn_col1:
@@ -150,11 +187,11 @@ if Zofri and archivos_2:
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         use_container_width=True
                     )
-                
+
             with m3:
                 st.metric("Reexpediciones (con Fecha de Cierre)", n_con_fecha)
-                st.write("") # Pequeño espacio para separar la métrica del botón
-                
+                st.write("")  # Pequeño espacio para separar la métrica del botón
+
                 # Subcolumnas [1, 1] hacen que el botón ocupe la mitad izquierda
                 btn_col2, _ = st.columns([1, 1])
                 with btn_col2:
