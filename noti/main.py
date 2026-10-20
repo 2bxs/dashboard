@@ -19,27 +19,223 @@ except ImportError:
 # Configuración de la página
 st.set_page_config(page_title="Generador de Notificaciones de Reexpedición", layout="wide")
 
-# Estilos visuales
+# Estilos visuales (estilo ArtCraft: oscuro, minimalista, tipografía técnica)
 st.markdown("""
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;620;700&family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500;700&display=swap');
+
+:root {
+    --bg: #060607;
+    --bg-raised: #121316;
+    --bg-sunken: #0a0a0b;
+    --ink: #f2f1ee;
+    --ink-strong: #ffffff;
+    --muted: rgba(242, 241, 238, 0.62);
+    --faint: rgba(242, 241, 238, 0.4);
+    --line: rgba(242, 241, 238, 0.16);
+    --line-strong: rgba(242, 241, 238, 0.4);
+    --accent: #2d81ff;
+    --accent-ink: #1659c4;
+    --danger: #b3261e;
+}
+
+/* Base de la app */
+.stApp, [data-testid="stAppViewContainer"], .main, section.main {
+    background-color: var(--bg) !important;
+    color: var(--ink) !important;
+    font-family: 'Inter', system-ui, sans-serif !important;
+}
+.block-container {
+    padding-top: 2.5rem !important;
+    padding-bottom: 3rem !important;
+    max-width: 1240px !important;
+}
+
+/* Tipografía */
+h1, h2, h3, h4, .stTitle, [data-testid="stHeader"] {
+    font-family: 'Archivo', system-ui, sans-serif !important;
+    font-weight: 620 !important;
+    letter-spacing: -0.02em !important;
+    color: var(--ink-strong) !important;
+}
+h1, .stTitle { font-size: 2.4rem !important; line-height: 1.05 !important; }
+h2, .stSubheader { font-size: 1.6rem !important; line-height: 1.1 !important; }
+h3 { font-size: 1.2rem !important; }
+p, span, label, div, li { color: var(--ink); }
+
+/* Botones */
 div.stButton > button, div.stDownloadButton > button {
-    min-width: 50% !important;
-    width: max-content !important;
-    display: block !important;
-    margin-right: auto !important;
+    background-color: #ffffff !important;
+    color: #0b0b0c !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    font-family: 'Geist Mono', ui-monospace, monospace !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    letter-spacing: 1.32px !important;
+    text-transform: uppercase !important;
+    padding: 10px 24px !important;
+    min-width: auto !important;
+    width: auto !important;
+    box-shadow: none !important;
+    transition: opacity 0.15s ease !important;
+    cursor: pointer !important;
 }
+div.stButton > button:hover, div.stDownloadButton > button:hover {
+    opacity: 0.82 !important;
+    background-color: #ffffff !important;
+    color: #0b0b0c !important;
+    border: 0 !important;
+}
+div.stButton > button:focus, div.stDownloadButton > button:focus {
+    outline: 1px solid var(--line-strong) !important;
+    outline-offset: 2px !important;
+    box-shadow: none !important;
+}
+/* Botones secundarios (outlined) */
+div.stButton > button[kind="secondary"] {
+    background-color: transparent !important;
+    color: var(--ink) !important;
+    border: 1px solid var(--line-strong) !important;
+}
+div.stButton > button[kind="secondary"]:hover {
+    background-color: var(--bg-raised) !important;
+    color: var(--ink-strong) !important;
+    opacity: 1 !important;
+}
+
+/* Inputs */
+.stTextInput input, .stNumberInput input, .stTextInput > div > div > input {
+    background-color: var(--bg-raised) !important;
+    color: var(--ink) !important;
+    border: 1px solid var(--line) !important;
+    border-radius: 0 !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 14px !important;
+}
+.stTextInput input:focus, .stNumberInput input:focus {
+    border-color: var(--line-strong) !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+.stTextInput label, .stNumberInput label {
+    font-family: 'Geist Mono', monospace !important;
+    font-size: 11px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1.32px !important;
+    color: var(--muted) !important;
+}
+
+/* File uploader */
+[data-testid="stFileUploader"] {
+    background-color: var(--bg-raised) !important;
+    border: 1px dashed var(--line-strong) !important;
+    border-radius: 0 !important;
+    padding: 1.25rem !important;
+}
+[data-testid="stFileUploader"] section {
+    background-color: transparent !important;
+}
+[data-testid="stFileUploader"] button {
+    background-color: transparent !important;
+    color: var(--ink) !important;
+    border: 1px solid var(--line-strong) !important;
+    border-radius: 0 !important;
+    font-family: 'Geist Mono', monospace !important;
+    font-size: 11px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1.32px !important;
+}
+[data-testid="stFileUploader"] small {
+    color: var(--muted) !important;
+    font-family: 'Geist Mono', monospace !important;
+    font-size: 10px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1.2px !important;
+}
+
+/* Métricas */
 [data-testid="metric-container"] {
-    border: 2px solid #FF8C00 !important;
-    border-radius: 15px !important;
-    padding: 15px !important;
+    background-color: var(--bg-raised) !important;
+    border: 1px solid var(--line) !important;
+    border-radius: 0 !important;
+    padding: 18px 20px !important;
 }
+[data-testid="stMetricLabel"] {
+    font-family: 'Geist Mono', monospace !important;
+    font-size: 10px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1.4px !important;
+    color: var(--muted) !important;
+}
+[data-testid="stMetricValue"] {
+    font-family: 'Archivo', sans-serif !important;
+    font-weight: 620 !important;
+    font-size: 1.9rem !important;
+    color: var(--ink-strong) !important;
+    letter-spacing: -0.02em !important;
+}
+
+/* Divisores */
 hr {
-    border-bottom: 2px solid #FF8C00 !important;
+    border: none !important;
+    border-top: 1px solid var(--line) !important;
+    margin: 2.5rem 0 !important;
 }
+
+/* Contenedores con borde */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    border: 1px solid var(--line) !important;
+    border-radius: 0 !important;
+    background-color: var(--bg-raised) !important;
+    padding: 1rem !important;
+}
+
+/* Caption */
+.stCaption, [data-testid="stCaptionContainer"] p {
+    color: var(--muted) !important;
+    font-family: 'Geist Mono', monospace !important;
+    font-size: 11px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1.32px !important;
+}
+
+/* Dataframe */
+[data-testid="stDataFrame"], [data-testid="stDataFrame"] > div {
+    border: 1px solid var(--line) !important;
+    border-radius: 0 !important;
+    background-color: var(--bg-raised) !important;
+}
+
+/* Alertas / mensajes */
+.stSuccess, .stError, .stInfo, .stWarning, [data-testid="stNotification"] {
+    border-radius: 0 !important;
+    border: 1px solid var(--line-strong) !important;
+    background-color: var(--bg-raised) !important;
+    color: var(--ink) !important;
+    font-family: 'Inter', sans-serif !important;
+}
+.stSuccess { border-left: 2px solid #ffffff !important; }
+.stError { border-left: 2px solid var(--danger) !important; }
+
+/* Spinner */
+.stSpinner > div {
+    border-color: var(--ink) transparent transparent transparent !important;
+}
+
+/* Scrollbar sutil */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 0; }
+
+/* Links */
+a { color: var(--accent) !important; text-decoration: none !important; }
+a:hover { text-decoration: underline !important; }
 </style>
 """, unsafe_allow_html=True)
 
 st.title("Generador Masivo de Notificaciones (Reexpediciones)")
+st.caption("Free & open source · No subscription required")
 
 # --- FUNCION INTELIGENTE DE CONVERSIÓN ---
 def convertir_a_pdf(docx_path, output_dir, pdf_path):
@@ -51,7 +247,7 @@ def convertir_a_pdf(docx_path, output_dir, pdf_path):
     else:
         # Usa LibreOffice si está desplegado en la nube de Streamlit (Linux)
         comando = [
-            "libreoffice", "--headless", "--convert-to", "pdf", 
+            "libreoffice", "--headless", "--convert-to", "pdf",
             docx_path, "--outdir", output_dir
         ]
         subprocess.run(comando, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -59,13 +255,13 @@ def convertir_a_pdf(docx_path, output_dir, pdf_path):
 # --- FUNCION REUTILIZABLE PARA GENERAR EL DOCUMENTO ---
 def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, template_file):
     grupo_rut = df_completo[df_completo['RUT'] == rut]
-    
+
     correo = grupo_rut['CORREO_FINAL'].iloc[0] if 'CORREO_FINAL' in grupo_rut.columns else ""
     tele = grupo_rut['TELE_FINAL'].iloc[0] if 'TELE_FINAL' in grupo_rut.columns else ""
 
     template_file.seek(0)
     doc = Document(template_file)
-    
+
     replacements = {
         "[NOM_IMPOR]": str(razon_social),
         "[RUT_IMP]": str(rut),
@@ -73,10 +269,10 @@ def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, tem
         "[CORREO]": str(correo),
         "[NRM]": str(nrm),
         "[FECHA_GEN]": str(fecha_gen),
-        "[FECH_GEN]": str(fecha_gen), 
+        "[FECH_GEN]": str(fecha_gen),
         "[GENE]": str(gene)
     }
-    
+
     for p in doc.paragraphs:
         for key, val in replacements.items():
             if key in p.text:
@@ -85,12 +281,12 @@ def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, tem
                     run.font.name = 'Tahoma'
                     run.font.size = Pt(9)
                     run.font.bold = True
-                
-    if doc.tables: 
+
+    if doc.tables:
         for table in doc.tables:
             for row in table.rows:
                 if any("[COD_RE]" in cell.text for cell in row.cells):
-                    row._element.getparent().remove(row._element) 
+                    row._element.getparent().remove(row._element)
 
         for table in doc.tables:
             for row in table.rows:
@@ -115,30 +311,30 @@ def procesar_documento(rut, nrm, fecha_gen, gene, razon_social, df_completo, tem
         tabla_dinamica = doc.tables[0]
         for _, reexp_row in grupo_rut.iterrows():
             cells = tabla_dinamica.add_row().cells
-            
-            if len(cells) >= 4: 
+
+            if len(cells) >= 4:
                 cells[0].text = str(reexp_row.get('REEXP.', ''))
                 cells[1].text = formatear_fecha(reexp_row.get('Fecha Documento/ Visación'))
                 cells[2].text = formatear_fecha(reexp_row.get('Fecha Control Salida'))
                 cells[3].text = str(reexp_row.get('Avanzada Aduana', ''))
-            
+
             if len(cells) >= 6:
                 cells[4].text = str(nrm)
                 cells[5].text = str(fecha_gen)
 
             for cell in cells:
                 for paragraph in cell.paragraphs:
-                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER 
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
                     for run in paragraph.runs:
-                        run.font.name = 'Tahoma' 
-                        run.font.size = Pt(9)   
-                        run.font.bold = True    
+                        run.font.name = 'Tahoma'
+                        run.font.size = Pt(9)
+                        run.font.bold = True
 
     os.makedirs("temp_docs", exist_ok=True)
     docx_path = f"temp_docs/{nrm}.docx"
     pdf_path = f"temp_docs/{nrm}.pdf"
     doc.save(docx_path)
-    
+
     try:
         convertir_a_pdf(docx_path, "temp_docs", pdf_path)
         return pdf_path, "pdf"
@@ -158,7 +354,7 @@ with col2:
 if excel_file and template_file:
     df = pd.read_excel(excel_file)
     df.columns = df.columns.str.strip()
-    
+
     if 'FONO 1' in df.columns:
         df['TELE_FINAL'] = df['FONO 1']
         if 'FONO 2' in df.columns: df['TELE_FINAL'] = df['TELE_FINAL'].fillna(df['FONO 2'])
@@ -191,7 +387,7 @@ if excel_file and template_file:
     meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
     hoy = datetime.datetime.now()
     fecha_actual_texto = f"{hoy.day:02d} de {meses[hoy.month - 1]} de {hoy.year}"
-    
+
     for i, row in resumen.iterrows():
         rut = row['RUT']
         if f"fec_{rut}" not in st.session_state:
@@ -213,13 +409,13 @@ if excel_file and template_file:
     # ==========================================
     st.divider()
     st.subheader("📊 3. Resumen y Generación Masiva")
-    
+
     total_empresas = len(resumen)
     total_reexpediciones = int(resumen['Cantidad de Reexpediciones'].sum())
     docs_a_generar = sum(1 for r in resumen['RUT'] if st.session_state.get(f"nrm_{r}", "").strip())
 
     met1, met2, met3, btn_col = st.columns([1, 1, 1, 1.2])
-    
+
     with met1:
         st.metric("Empresas Totales", total_empresas)
     with met2:
@@ -228,29 +424,29 @@ if excel_file and template_file:
         st.metric("Documentos a Generar", docs_a_generar)
 
     with btn_col:
-        st.write("") 
+        st.write("")
         st.write("")
         if st.button("🚀 Generar Masivamente", type="primary"):
             with st.spinner("Procesando documentos..."):
                 generated_files = []
-                
+
                 for index, row in resumen.iterrows():
                     rut = row['RUT']
                     nrm_actual = st.session_state.get(f"nrm_{rut}", "")
                     fecha_actual = st.session_state.get(f"fec_{rut}", fecha_actual_texto)
-                    
-                    if nrm_actual.strip(): 
+
+                    if nrm_actual.strip():
                         file_path, _ = procesar_documento(
                             rut, nrm_actual, fecha_actual, global_gene, row['Nombre de Empresa'], df, template_file
                         )
                         generated_files.append(file_path)
-                
+
                 if generated_files:
                     zip_buffer = io.BytesIO()
                     with zipfile.ZipFile(zip_buffer, "w") as zip_file:
                         for file_path in generated_files:
                             zip_file.write(file_path, os.path.basename(file_path))
-                    
+
                     st.success("¡Documentos generados con éxito!")
                     st.download_button(
                         label="📥 Descargar ZIP Completo",
@@ -264,10 +460,10 @@ if excel_file and template_file:
     # ==========================================
     st.divider()
     st.subheader("📋 Registros Pendientes")
-    
+
     with st.container(border=True):
-        col_widths = [2.2, 1.2, 0.6, 1.2, 1.5, 1.0, 1.3] 
-        
+        col_widths = [2.2, 1.2, 0.6, 1.2, 1.5, 1.0, 1.3]
+
         h1, h2, h3, h4, h5, h6, h7 = st.columns(col_widths)
         h1.markdown("**Empresa**")
         h2.markdown("**RUT**")
@@ -276,35 +472,35 @@ if excel_file and template_file:
         h5.markdown("**Fecha Gen.**")
         h6.markdown("**Acción**")
         h7.markdown("**Archivo**")
-        
-        st.markdown("---") 
+
+        st.markdown("---")
 
         for index, row in resumen.iterrows():
             c1, c2, c3, c4, c5, c6, c7 = st.columns(col_widths)
             rut = row['RUT']
-            
+
             c1.write(row['Nombre de Empresa'])
             c2.write(rut)
             c3.write(str(row['Cantidad de Reexpediciones']))
-            
+
             nrm = c4.text_input("NRM", key=f"nrm_{rut}", label_visibility="collapsed")
             fecha_gen = c5.text_input("Fecha", key=f"fec_{rut}", label_visibility="collapsed")
-            
+
             key_estado = f"file_data_{rut}"
-            
+
             with c6:
                 if st.button("⚙️ Generar", key=f"btn_gen_{rut}"):
-                    if nrm: 
+                    if nrm:
                         with st.spinner("⏳"):
                             file_path, ext = procesar_documento(rut, nrm, fecha_gen, global_gene, row['Nombre de Empresa'], df, template_file)
-                            
+
                             with open(file_path, "rb") as f:
                                 st.session_state[key_estado] = {
                                     "bytes": f.read(),
                                     "name": os.path.basename(file_path),
                                     "mime": "application/pdf" if ext == "pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                                 }
-            
+
             with c7:
                 if key_estado in st.session_state:
                     file_info = st.session_state[key_estado]
@@ -330,28 +526,28 @@ if archivos_docx:
         with st.spinner("Convirtiendo documentos... esto puede tardar unos segundos."):
             os.makedirs("temp_convert", exist_ok=True)
             pdf_convertidos = []
-            
+
             for archivo in archivos_docx:
                 docx_path = os.path.join("temp_convert", archivo.name)
                 with open(docx_path, "wb") as f:
                     f.write(archivo.getbuffer())
-                
+
                 nombre_base = os.path.splitext(archivo.name)[0]
                 pdf_path = os.path.join("temp_convert", f"{nombre_base}.pdf")
-                
+
                 try:
                     convertir_a_pdf(docx_path, "temp_convert", pdf_path)
                     if os.path.exists(pdf_path):
                         pdf_convertidos.append(pdf_path)
                 except Exception as e:
                     st.error(f"Error convirtiendo {archivo.name}: {e}")
-            
+
             if pdf_convertidos:
                 zip_buffer_conv = io.BytesIO()
                 with zipfile.ZipFile(zip_buffer_conv, "w") as zip_file:
                     for pdf_file in pdf_convertidos:
                         zip_file.write(pdf_file, os.path.basename(pdf_file))
-                
+
                 st.success(f"¡Se convirtieron {len(pdf_convertidos)} archivos con éxito!")
                 st.download_button(
                     label="📥 Descargar PDFs en archivo ZIP",
