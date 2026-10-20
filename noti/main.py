@@ -65,9 +65,9 @@ p, span, label, div, li { color: var(--ink); }
 
 /* Botones */
 div.stButton > button, div.stDownloadButton > button {
-    background-color: #ffffff !important;
-    color: #0b0b0c !important;
-    border: 0 !important;
+    background-color: var(--bg-raised) !important;
+    color: var(--ink-strong) !important;
+    border: 1px solid var(--line-strong) !important;
     border-radius: 0 !important;
     font-family: 'Geist Mono', ui-monospace, monospace !important;
     font-size: 11px !important;
@@ -78,19 +78,30 @@ div.stButton > button, div.stDownloadButton > button {
     min-width: auto !important;
     width: auto !important;
     box-shadow: none !important;
-    transition: opacity 0.15s ease !important;
+    transition: background-color 0.15s ease, border-color 0.15s ease !important;
     cursor: pointer !important;
 }
 div.stButton > button:hover, div.stDownloadButton > button:hover {
-    opacity: 0.82 !important;
-    background-color: #ffffff !important;
-    color: #0b0b0c !important;
-    border: 0 !important;
+    background-color: #1f2024 !important;
+    color: var(--ink-strong) !important;
+    border-color: var(--ink) !important;
 }
 div.stButton > button:focus, div.stDownloadButton > button:focus {
     outline: 1px solid var(--line-strong) !important;
     outline-offset: 2px !important;
     box-shadow: none !important;
+}
+/* Botón primario (resaltado) */
+div.stButton > button[kind="primary"], div.stDownloadButton > button[kind="primary"] {
+    background-color: var(--ink-strong) !important;
+    color: #0b0b0c !important;
+    border: 1px solid var(--ink-strong) !important;
+}
+div.stButton > button[kind="primary"]:hover, div.stDownloadButton > button[kind="primary"]:hover {
+    background-color: #e8e7e4 !important;
+    color: #0b0b0c !important;
+    border-color: #e8e7e4 !important;
+    opacity: 1 !important;
 }
 /* Botones secundarios (outlined) */
 div.stButton > button[kind="secondary"] {
