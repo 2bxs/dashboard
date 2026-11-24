@@ -26,6 +26,47 @@ from PIL import Image
 
 st.set_page_config(page_title="Consulta de documentos — SVE ZOFRI", layout="wide")
 
+st.markdown(
+    """
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+      html, body, [class*="css"] { font-family: "Inter", system-ui, sans-serif !important; }
+      .stApp { background: #050505 !important; color: #F2F2F2 !important; }
+      section[data-testid="stSidebar"] { display: none !important; }
+      .block-container { padding: 32px !important; max-width: 1100px; }
+      h1, h2, h3 { color: #F2F2F2 !important; font-weight: 600 !important; }
+      p, label, .stCaption { color: #929292 !important; }
+      .stTextInput input, .stTextArea textarea, .stFileUploader {
+        background: #0f0f0f !important;
+        border: 1px solid #1a1a1a !important;
+        border-radius: 8px !important;
+        color: #F2F2F2 !important;
+      }
+      .stButton > button {
+        background: #202020 !important;
+        color: #F2F2F2 !important;
+        border: 1px solid #1a1a1a !important;
+        border-radius: 6px !important;
+        font-weight: 500 !important;
+      }
+      .stButton > button:hover { background: #141414 !important; }
+      .stButton > button:disabled { opacity: 0.5 !important; }
+      div[data-testid="stMetric"] {
+        background: #090909 !important;
+        border: 1px solid #1a1a1a !important;
+        border-radius: 12px !important;
+        padding: 16px !important;
+      }
+      div[data-testid="stMetricLabel"] { color: #929292 !important; }
+      div[data-testid="stMetricValue"] { color: #F2F2F2 !important; }
+      .stDataFrame, .stTable { border: 1px solid #1a1a1a !important; border-radius: 12px !important; }
+      hr { border-color: #1a1a1a !important; }
+      .stAlert { border-radius: 8px !important; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 BASE = "https://svepp.zofri.cl"
 PANTALLA = BASE + "/index.php?sys&method=view"
 DOC_RE = re.compile(r"^\d{3}-\d{2}-\d{6}$")
