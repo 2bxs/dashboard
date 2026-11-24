@@ -61,7 +61,8 @@ st.markdown(
       div[data-testid="stMetricValue"] { color: #F2F2F2 !important; }
       .stDataFrame, .stTable { border: 1px solid #1a1a1a !important; border-radius: 12px !important; }
       hr { border-color: #1a1a1a !important; }
-      .stAlert { border-radius: 8px !important; position: fixed !important; top: 20px !important; left: 50% !important; transform: translateX(-50%) !important; z-index: 9999 !important; min-width: 320px !important; max-width: 90% !important; box-shadow: 0 10px 30px rgba(0,0,0,0.5) !important; animation: fadeIn 0.15s ease; }
+      .stAlert { border-radius: 8px !important; }
+      div[data-testid="stToastContainer"] { position: fixed !important; bottom: 20px !important; left: 50% !important; transform: translateX(-50%) !important; z-index: 9999 !important; display: flex !important; flex-direction: column !important; align-items: center !important; gap: 8px !important; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -279,18 +280,18 @@ if iniciar:
         datos = iniciar_sesion(usuario, clave)
         st.session_state.session_activa = bool(datos.get("activa"))
         st.session_state.session_usuario = datos.get("usuario", "")
-        st.success("Sesión iniciada correctamente.")
+        st.toast("Sesión iniciada correctamente.", icon="✅")
     except Exception as error:  # noqa: BLE001
         st.session_state.session_activa = False
         st.session_state.session_usuario = ""
-        st.error(str(error))
+        st.toast(str(error), icon="❌")
 
 if cerrar:
     SESSION.update({"activa": False, "usuario": ""})
     jar.clear()
     st.session_state.session_activa = False
     st.session_state.session_usuario = ""
-    st.success("Sesión cerrada.")
+    st.toast("Sesión cerrada.", icon="✅")
 
 if st.session_state.session_activa:
     st.success(f"Conectado: {st.session_state.session_usuario}")
@@ -307,7 +308,7 @@ uploaded = col_up.file_uploader("Archivos PDF", type=["pdf"], accept_multiple_fi
 
 if importar_btn:
     if not uploaded:
-        st.error("Elegí al menos un archivo PDF.")
+        st.toast("Elegí al menos un archivo PDF.", icon="❌")
     else:
         nuevos_total = 0
         detalles = []
@@ -336,9 +337,9 @@ if importar_btn:
                     nuevos_total += len(nuevos)
         msg = f"{sum(1 for _ in uploaded)} archivo(s) procesado(s). {nuevos_total} agregado(s). " + " · ".join(detalles)
         if nuevos_total:
-            st.success(msg)
+            st.toast(msg, icon="✅")
         else:
-            st.info(msg)
+            st.toast(msg, icon="ℹ️")
         st.rerun()
 
 st.text_area(
@@ -350,7 +351,7 @@ st.text_area(
 if consultar_btn:
     codigos_lista = [c for c in re.split(r"[\s,;]+", st.session_state.codigos_area) if c.strip()]
     if not codigos_lista:
-        st.error("Pegá al menos un código.")
+        st.toast("Pegá al menos un código.", icon="❌")
     else:
         with st.spinner(f"Consultando {len(codigos_lista)} código(s)..."):
             documentos = normalizar(codigos_lista)
@@ -361,7 +362,7 @@ if consultar_btn:
                 except Exception as error:  # noqa: BLE001
                     resultados.append({"documento": doc, "estado": "ERROR", "mensaje": str(error)})
             st.session_state.resultados = resultados
-        st.success("Consulta terminada.")
+        st.toast("Consulta terminada.", icon="✅")
 
 # 3. Resultados
 st.subheader("3. Resultados")
