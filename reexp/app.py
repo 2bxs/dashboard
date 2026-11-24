@@ -61,7 +61,7 @@ st.markdown(
       div[data-testid="stMetricValue"] { color: #F2F2F2 !important; }
       .stDataFrame, .stTable { border: 1px solid #1a1a1a !important; border-radius: 12px !important; }
       hr { border-color: #1a1a1a !important; }
-      .stAlert { border-radius: 8px !important; }
+      .stAlert { border-radius: 8px !important; position: fixed !important; top: 20px !important; left: 50% !important; transform: translateX(-50%) !important; z-index: 9999 !important; min-width: 320px !important; max-width: 90% !important; box-shadow: 0 10px 30px rgba(0,0,0,0.5) !important; animation: fadeIn 0.15s ease; }
     </style>
     """,
     unsafe_allow_html=True,
