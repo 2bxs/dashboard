@@ -246,6 +246,30 @@ def procesar_pdf(contenido: bytes, nombre: str) -> dict:
 
 # ---------- Interfaz Streamlit ----------
 
+def mensaje_flotante(texto: str, icono: str = "ℹ️") -> None:
+    """Muestra un mensaje flotante en la parte inferior, 2 segundos."""
+    import json as _json
+
+    contenido = _json.dumps(f"{icono} {texto}")
+    st.markdown(
+        f"""
+        <div id="toast-container" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;"></div>
+        <script>
+        (function(){{
+          var container = document.getElementById('toast-container');
+          if (!container) return;
+          var toast = document.createElement('div');
+          toast.style.cssText = 'background:#0f0f0f;color:#F2F2F2;border:1px solid #1a1a1a;border-radius:8px;padding:6px 12px;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.5);opacity:0;transition:opacity .3s ease;width:fit-content;max-width:90vw;pointer-events:auto;';
+          toast.textContent = {contenido};
+          container.appendChild(toast);
+          requestAnimationFrame(function(){{ toast.style.opacity = '1'; }});
+          setTimeout(function(){{ toast.style.opacity = '0'; setTimeout(function(){{ toast.remove(); }}, 300); }}, 2000);
+        }})();
+        </script>
+        """,
+        unsafe_allow_html=True,
+    )
+
 st.title("Consulta de documentos · SVE ZOFRI")
 st.caption("Revisa en lote si un código xxx-xx-xxxxxx ya fue controlado en Control de Tránsito.")
 
@@ -280,21 +304,21 @@ if iniciar:
         datos = iniciar_sesion(usuario, clave)
         st.session_state.session_activa = bool(datos.get("activa"))
         st.session_state.session_usuario = datos.get("usuario", "")
-        st.toast("Sesión iniciada correctamente.", icon="✅")
+        mensaje_flotante("Sesión iniciada correctamente.", "✅")
     except Exception as error:  # noqa: BLE001
         st.session_state.session_activa = False
         st.session_state.session_usuario = ""
-        st.toast(str(error), icon="❌")
+        mensaje_flotante(str(error), "❌")
 
 if cerrar:
     SESSION.update({"activa": False, "usuario": ""})
     jar.clear()
     st.session_state.session_activa = False
     st.session_state.session_usuario = ""
-    st.toast("Sesión cerrada.", icon="✅")
+    mensaje_flotante("Sesión cerrada.", "✅")
 
 if st.session_state.session_activa:
-    st.success(f"Conectado: {st.session_state.session_usuario}")
+    mensaje_flotante(f"Conectado: {st.session_state.session_usuario}", "✅")
 else:
     st.warning("Sin sesión")
 
@@ -308,7 +332,7 @@ uploaded = col_up.file_uploader("Archivos PDF", type=["pdf"], accept_multiple_fi
 
 if importar_btn:
     if not uploaded:
-        st.toast("Elegí al menos un archivo PDF.", icon="❌")
+        mensaje_flotante("Elegí al menos un archivo PDF.", "❌")
     else:
         nuevos_total = 0
         detalles = []
@@ -337,9 +361,9 @@ if importar_btn:
                     nuevos_total += len(nuevos)
         msg = f"{sum(1 for _ in uploaded)} archivo(s) procesado(s). {nuevos_total} agregado(s). " + " · ".join(detalles)
         if nuevos_total:
-            st.toast(msg, icon="✅")
+            mensaje_flotante(msg, "✅")
         else:
-            st.toast(msg, icon="ℹ️")
+            mensaje_flotante(msg, "ℹ️")
         st.rerun()
 
 st.text_area(
@@ -351,7 +375,7 @@ st.text_area(
 if consultar_btn:
     codigos_lista = [c for c in re.split(r"[\s,;]+", st.session_state.codigos_area) if c.strip()]
     if not codigos_lista:
-        st.toast("Pegá al menos un código.", icon="❌")
+        mensaje_flotante("Pegá al menos un código.", "❌")
     else:
         with st.spinner(f"Consultando {len(codigos_lista)} código(s)..."):
             documentos = normalizar(codigos_lista)
@@ -362,7 +386,7 @@ if consultar_btn:
                 except Exception as error:  # noqa: BLE001
                     resultados.append({"documento": doc, "estado": "ERROR", "mensaje": str(error)})
             st.session_state.resultados = resultados
-        st.toast("Consulta terminada.", icon="✅")
+        mensaje_flotante("Consulta terminada.", "✅")
 
 # 3. Resultados
 st.subheader("3. Resultados")
