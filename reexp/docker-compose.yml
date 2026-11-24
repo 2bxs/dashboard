@@ -1,9 +1,0 @@
-services:
-  web:
-    build: .
-    ports:
-      - "8765:7860"
-    environment:
-      SVE_USER: ${SVE_USER:-}
-      SVE_PASS: ${SVE_PASS:-}
-    restart: unless-stopped
