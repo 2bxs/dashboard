@@ -259,14 +259,15 @@ if "codigos_area" not in st.session_state:
 
 # 1. Sesión
 st.subheader("1. Sesión")
-col_u, col_p, col_b = st.columns([2, 2, 1])
+col_u, col_p, col_b1, col_b2 = st.columns([2, 2, 1, 1], vertical_alignment="bottom")
 with col_u:
     usuario_input = st.text_input("Usuario del SVE", value=SVE_USER if SVE_USER else "", key="usuario")
 with col_p:
     clave_input = st.text_input("Contraseña", type="password", key="clave")
-with col_b:
-    st.write("")
-    iniciar = st.button("Iniciar sesión")
+with col_b1:
+    iniciar = st.button("Iniciar sesión", use_container_width=True)
+with col_b2:
+    cerrar = st.button("Cerrar sesión", use_container_width=True)
 
 if SVE_USER and SVE_PASS:
     st.info("El servidor ya tiene las credenciales configuradas: podés dejar la contraseña vacía y clic en Iniciar sesión.")
@@ -284,6 +285,13 @@ if iniciar:
         st.session_state.session_usuario = ""
         st.error(str(error))
 
+if cerrar:
+    SESSION.update({"activa": False, "usuario": ""})
+    jar.clear()
+    st.session_state.session_activa = False
+    st.session_state.session_usuario = ""
+    st.success("Sesión cerrada.")
+
 if st.session_state.session_activa:
     st.success(f"Conectado: {st.session_state.session_usuario}")
 else:
@@ -292,7 +300,7 @@ else:
 # 2. Códigos
 st.subheader("2. Códigos a revisar")
 
-col_btn1, col_btn2, col_up = st.columns([1, 1, 2])
+col_btn1, col_btn2, col_up = st.columns([1, 1, 2], vertical_alignment="bottom")
 consultar_btn = col_btn1.button("Consultar documentos", disabled=not st.session_state.session_activa)
 importar_btn = col_btn2.button("Importar reexpediciones (PDF)")
 uploaded = col_up.file_uploader("Archivos PDF", type=["pdf"], accept_multiple_files=True, key="pdfs", label_visibility="collapsed")
