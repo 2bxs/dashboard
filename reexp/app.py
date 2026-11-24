@@ -246,19 +246,27 @@ def procesar_pdf(contenido: bytes, nombre: str) -> dict:
 
 # ---------- Interfaz Streamlit ----------
 
+import streamlit.components.v1 as components
+
+
 def mensaje_flotante(texto: str, icono: str = "ℹ️") -> None:
     """Muestra un mensaje flotante en la parte inferior, 2 segundos."""
     import json as _json
 
     contenido = _json.dumps(f"{icono} {texto}")
-    st.markdown(
+    components.html(
         f"""
-        <div id="toast-container" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;"></div>
         <script>
         (function(){{
-          var container = document.getElementById('toast-container');
-          if (!container) return;
-          var toast = document.createElement('div');
+          var doc = window.parent.document;
+          var container = doc.getElementById('toast-container');
+          if (!container) {{
+            container = doc.createElement('div');
+            container.id = 'toast-container';
+            container.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;';
+            doc.body.appendChild(container);
+          }}
+          var toast = doc.createElement('div');
           toast.style.cssText = 'background:#0f0f0f;color:#F2F2F2;border:1px solid #1a1a1a;border-radius:8px;padding:6px 12px;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.5);opacity:0;transition:opacity .3s ease;width:fit-content;max-width:90vw;pointer-events:auto;';
           toast.textContent = {contenido};
           container.appendChild(toast);
@@ -267,7 +275,7 @@ def mensaje_flotante(texto: str, icono: str = "ℹ️") -> None:
         }})();
         </script>
         """,
-        unsafe_allow_html=True,
+        height=0,
     )
 
 st.title("Consulta de documentos · SVE ZOFRI")
@@ -277,6 +285,8 @@ if "session_activa" not in st.session_state:
     st.session_state.session_activa = bool(SESSION.get("activa", False))
 if "session_usuario" not in st.session_state:
     st.session_state.session_usuario = SESSION.get("usuario", "")
+if "show_connected" not in st.session_state:
+    st.session_state.show_connected = False
 if "resultados" not in st.session_state:
     st.session_state.resultados = []
 if "codigos_area" not in st.session_state:
@@ -284,43 +294,44 @@ if "codigos_area" not in st.session_state:
 
 # 1. Sesión
 st.subheader("1. Sesión")
-col_u, col_p, col_b1, col_b2 = st.columns([2, 2, 1, 1], vertical_alignment="bottom")
-with col_u:
-    usuario_input = st.text_input("Usuario del SVE", value=SVE_USER if SVE_USER else "", key="usuario")
-with col_p:
-    clave_input = st.text_input("Contraseña", type="password", key="clave")
-with col_b1:
-    iniciar = st.button("Iniciar sesión", use_container_width=True)
-with col_b2:
-    cerrar = st.button("Cerrar sesión", use_container_width=True)
-
-if SVE_USER and SVE_PASS:
-    st.info("El servidor ya tiene las credenciales configuradas: podés dejar la contraseña vacía y clic en Iniciar sesión.")
-
-if iniciar:
-    usuario = (usuario_input or "").strip() or SVE_USER
-    clave = (clave_input or "") or SVE_PASS
-    try:
-        datos = iniciar_sesion(usuario, clave)
-        st.session_state.session_activa = bool(datos.get("activa"))
-        st.session_state.session_usuario = datos.get("usuario", "")
-        mensaje_flotante("Sesión iniciada correctamente.", "✅")
-    except Exception as error:  # noqa: BLE001
+if st.session_state.session_activa:
+    col_b = st.columns([1])
+    if col_b[0].button("Cerrar sesión", use_container_width=True):
+        SESSION.update({"activa": False, "usuario": ""})
+        jar.clear()
         st.session_state.session_activa = False
         st.session_state.session_usuario = ""
-        mensaje_flotante(str(error), "❌")
-
-if cerrar:
-    SESSION.update({"activa": False, "usuario": ""})
-    jar.clear()
-    st.session_state.session_activa = False
-    st.session_state.session_usuario = ""
-    mensaje_flotante("Sesión cerrada.", "✅")
-
-if st.session_state.session_activa:
-    mensaje_flotante(f"Conectado: {st.session_state.session_usuario}", "✅")
+        mensaje_flotante("Sesión cerrada.", "✅")
+        st.rerun()
+    if st.session_state.get("show_connected"):
+        mensaje_flotante(f"Conectado: {st.session_state.session_usuario}", "✅")
+        st.session_state.show_connected = False
 else:
-    st.warning("Sin sesión")
+    col_u, col_p, col_b = st.columns([2, 2, 1], vertical_alignment="bottom")
+    with col_u:
+        usuario_input = st.text_input("Usuario del SVE", value=SVE_USER if SVE_USER else "", key="usuario")
+    with col_p:
+        clave_input = st.text_input("Contraseña", type="password", key="clave")
+    with col_b:
+        iniciar = st.button("Iniciar sesión", use_container_width=True)
+
+    if SVE_USER and SVE_PASS:
+        st.info("El servidor ya tiene las credenciales configuradas: podés dejar la contraseña vacía y clic en Iniciar sesión.")
+
+    if iniciar:
+        usuario = (usuario_input or "").strip() or SVE_USER
+        clave = (clave_input or "") or SVE_PASS
+        try:
+            datos = iniciar_sesion(usuario, clave)
+            st.session_state.session_activa = bool(datos.get("activa"))
+            st.session_state.session_usuario = datos.get("usuario", "")
+            st.session_state.show_connected = True
+            mensaje_flotante("Sesión iniciada correctamente.", "✅")
+            st.rerun()
+        except Exception as error:  # noqa: BLE001
+            st.session_state.session_activa = False
+            st.session_state.session_usuario = ""
+            mensaje_flotante(str(error), "❌")
 
 # 2. Códigos
 st.subheader("2. Códigos a revisar")
