@@ -292,11 +292,10 @@ else:
 # 2. Códigos
 st.subheader("2. Códigos a revisar")
 
-col_btn1, col_btn2 = st.columns([1, 1])
+col_btn1, col_btn2, col_up = st.columns([1, 1, 2])
 consultar_btn = col_btn1.button("Consultar documentos", disabled=not st.session_state.session_activa)
 importar_btn = col_btn2.button("Importar reexpediciones (PDF)")
-
-uploaded = st.file_uploader("Archivos PDF", type=["pdf"], accept_multiple_files=True, key="pdfs")
+uploaded = col_up.file_uploader("Archivos PDF", type=["pdf"], accept_multiple_files=True, key="pdfs", label_visibility="collapsed")
 
 if importar_btn:
     if not uploaded:
