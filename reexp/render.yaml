@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: sve-zofri
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      - key: SVE_USER
+        sync: false
+      - key: SVE_PASS
+        sync: false
