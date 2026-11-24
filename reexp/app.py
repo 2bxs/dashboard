@@ -291,11 +291,6 @@ else:
 
 # 2. Códigos
 st.subheader("2. Códigos a revisar")
-st.text_area(
-    "Códigos (uno por línea, separados por coma o sin guiones)",
-    height=160,
-    key="codigos_area",
-)
 
 col_btn1, col_btn2 = st.columns([1, 1])
 consultar_btn = col_btn1.button("Consultar documentos", disabled=not st.session_state.session_activa)
@@ -322,12 +317,13 @@ if importar_btn:
                 detalles.append(f"{informe['nombre']}: {informe['error']}")
             else:
                 detalles.append(f"{informe['nombre']}: {len(informe.get('codigos', []))} código(s)")
-                actuales = [c for c in st.session_state.codigos_area.splitlines() if c.strip()]
+                actuales = [c for c in st.session_state.get("codigos_area", "").splitlines() if c.strip()]
                 # normalizar lista actual
                 nuevos = [c for c in informe.get("codigos", []) if c not in actuales]
                 if nuevos:
-                    if st.session_state.codigos_area.strip():
-                        st.session_state.codigos_area = st.session_state.codigos_area.rstrip() + "\n" + "\n".join(nuevos)
+                    actual = st.session_state.get("codigos_area", "")
+                    if actual.strip():
+                        st.session_state.codigos_area = actual.rstrip() + "\n" + "\n".join(nuevos)
                     else:
                         st.session_state.codigos_area = "\n".join(nuevos)
                     nuevos_total += len(nuevos)
@@ -337,6 +333,12 @@ if importar_btn:
         else:
             st.info(msg)
         st.rerun()
+
+st.text_area(
+    "Códigos (uno por línea, separados por coma o sin guiones)",
+    height=160,
+    key="codigos_area",
+)
 
 if consultar_btn:
     codigos_lista = [c for c in re.split(r"[\s,;]+", st.session_state.codigos_area) if c.strip()]
