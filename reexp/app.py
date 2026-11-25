@@ -336,9 +336,8 @@ else:
 # 2. Códigos
 st.subheader("2. Códigos a revisar")
 
-col_btn1, col_btn2, col_up = st.columns([1, 1, 2], vertical_alignment="bottom")
-consultar_btn = col_btn1.button("Consultar documentos", disabled=not st.session_state.session_activa)
-importar_btn = col_btn2.button("Importar reexpediciones (PDF)")
+col_imp, col_up = st.columns([1, 3], vertical_alignment="bottom")
+importar_btn = col_imp.button("Importar reexpediciones (PDF)")
 uploaded = col_up.file_uploader("Archivos PDF", type=["pdf"], accept_multiple_files=True, key="pdfs", label_visibility="collapsed")
 
 if importar_btn:
@@ -382,6 +381,8 @@ st.text_area(
     height=160,
     key="codigos_area",
 )
+
+consultar_btn = st.button("Consultar documentos", disabled=not st.session_state.session_activa)
 
 if consultar_btn:
     codigos_lista = [c for c in re.split(r"[\s,;]+", st.session_state.codigos_area) if c.strip()]
