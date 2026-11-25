@@ -322,6 +322,13 @@ if Zofri and archivos_2:
                 df_con_fecha_export = df_con_fecha_export[df_con_fecha_export['Fecha Cierre'].astype(str).str.strip().str.lower() != 'nan']
                 df_con_fecha_export = df_con_fecha_export[df_con_fecha_export['Fecha Cierre'].astype(str).str.strip().str.lower() != 'nat']
 
+            # Eliminar reexpediciones duplicadas: solo un número único por reexpedición
+            if 'Reexpediciones' in df_con_fecha_export.columns:
+                df_con_fecha_export = df_con_fecha_export.drop_duplicates(subset=['Reexpediciones'], keep='first').reset_index(drop=True)
+
+            # Mantener la métrica consistente con el listado final (únicos)
+            n_con_fecha = len(df_con_fecha_export)
+
             # Máscara booleana: ¿la fila tiene Fecha Cierre válida?
             if 'Fecha Cierre' in df_match.columns:
                 s_str = df_match['Fecha Cierre'].astype(str).str.strip()
@@ -330,7 +337,7 @@ if Zofri and archivos_2:
             else:
                 mask_fecha = pd.Series(False, index=df_match.index)
 
-            n_con_fecha = int(mask_fecha.sum())
+            # n_con_fecha ya se calculó sobre el listado final deduplicado (línea anterior al bloque de máscara)
 
             # 3.1 Resumen: cuántas reexpediciones por cumplir corresponden a cada archivo
             df_resumen = None
