@@ -287,15 +287,10 @@ if archivos:
             else:
                 st.info("No se encontraron registros coincidentes.")
 
-            # Listado desplegado al costado (panel lateral)
-            with st.sidebar:
-                st.subheader("📋 Listado coincidentes")
-                st.caption("Registros donde 'Lugar Presentación' = 'Aduana Destino'")
-                if len(df_coincidentes) > 0:
-                    with st.expander("Ver listado", expanded=True):
-                        st.dataframe(df_coincidentes, use_container_width=True, hide_index=True)
-                else:
-                    st.info("Sin coincidencias.")
+            # Tabla mostrada abajo en la página principal
+            st.divider()
+            st.subheader("📋 Registros donde 'Lugar Presentación' = 'Aduana Destino'")
+            st.dataframe(df_coincidentes, use_container_width=True, hide_index=True)
     except Exception as e:
         st.error(f"Error procesando los datos: {e}")
 else:
